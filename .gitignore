@@ -1,0 +1,98 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/__pycache__/
+backend/.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.Python
+
+# Environment files
+.env
+.env.local
+.env.production
+*.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+vendor.db
+
+# Logs
+*.log
+logs/
+backend/backend.log
+frontend/frontend.log
+
+# Build outputs
+build/
+dist/
+.next/
+out/
+frontend/.next/
+frontend/build/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Uploads and media
+uploads/
+backend/uploads/
+
+# Package manager lock files
+package-lock.json
+yarn.lock
+
+# Testing
+coverage/
+.nyc_output
+.coverage
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Docker
+.dockerignore
+
+# Python virtual environments
+venv/
+env/
+ENV/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# SSL certificates (keep example files)
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+
+# Local development files
+create-admin.py
+create-demo-data.py
+init-database.py
+
+# Ensure node_modules is never tracked
+**/node_modules/
+node_modules
