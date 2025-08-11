@@ -65,7 +65,7 @@ export default function VendorApplicationPage() {
     watch,
     formState: { errors },
   } = useForm<VendorApplicationCreate>({
-    resolver: yupResolver(schema),
+    resolver: yupResolver(schema) as any,
     defaultValues: {
       country: 'India'
     }
