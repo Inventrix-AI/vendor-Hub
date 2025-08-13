@@ -1,121 +1,93 @@
+from http.server import BaseHTTPRequestHandler
 import json
 import time
-from typing import Dict, Any
 
-def handler(request, response):
-    """Vercel serverless function for admin operations"""
-    
-    try:
-        if request.method == 'GET':
-            if '/applications' in request.url:
-                return handle_get_applications(request)
-            elif '/dashboard' in request.url:
-                return handle_dashboard_stats(request)
-        elif request.method == 'PUT':
-            return handle_update_application_status(request)
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if '/applications' in self.path:
+            self.handle_get_applications()
         else:
-            return {
-                'statusCode': 405,
-                'headers': {'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Method not allowed'})
-            }
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': str(e)})
-        }
-
-def handle_get_applications(request):
-    """Get all vendor applications for admin review"""
-    applications = [
-        {
-            'id': 1,
-            'company_name': 'Tech Solutions Inc',
-            'contact_email': 'contact@techsolutions.com',
-            'business_type': 'Technology',
-            'status': 'pending',
-            'submitted_at': '2024-01-15 10:30:00',
-            'documents': ['business_license.pdf', 'tax_certificate.pdf']
-        },
-        {
-            'id': 2,
-            'company_name': 'Green Supplies Co',
-            'contact_email': 'info@greensupplies.com',
-            'business_type': 'Environmental',
-            'status': 'approved',
-            'submitted_at': '2024-01-16 14:20:00',
-            'documents': ['license.pdf']
-        },
-        {
-            'id': 3,
-            'company_name': 'Food Distributors LLC',
-            'contact_email': 'sales@fooddist.com',
-            'business_type': 'Food & Beverage',
-            'status': 'rejected',
-            'submitted_at': '2024-01-17 09:15:00',
-            'rejection_reason': 'Incomplete documentation'
-        }
-    ]
+            self.handle_dashboard_stats()
     
-    return {
-        'statusCode': 200,
-        'headers': {'Access-Control-Allow-Origin': '*'},
-        'body': json.dumps(applications)
-    }
-
-def handle_dashboard_stats(request):
-    """Get dashboard statistics for admin"""
-    stats = {
-        'total_applications': 15,
-        'pending_applications': 8,
-        'approved_applications': 5,
-        'rejected_applications': 2,
-        'recent_activity': [
+    def do_PUT(self):
+        self.handle_update_application_status()
+    
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+    
+    def handle_get_applications(self):
+        """Get all vendor applications for admin review"""
+        applications = [
             {
                 'id': 1,
-                'action': 'New application submitted',
-                'company': 'Tech Solutions Inc',
-                'timestamp': '2024-01-15 10:30:00'
+                'company_name': 'Tech Solutions Inc',
+                'contact_email': 'contact@techsolutions.com',
+                'business_type': 'Technology',
+                'status': 'pending',
+                'submitted_at': '2024-01-15 10:30:00',
+                'documents': ['business_license.pdf', 'tax_certificate.pdf']
             },
             {
                 'id': 2,
-                'action': 'Application approved',
-                'company': 'Green Supplies Co',
-                'timestamp': '2024-01-16 14:20:00'
+                'company_name': 'Green Supplies Co',
+                'contact_email': 'info@greensupplies.com',
+                'business_type': 'Environmental',
+                'status': 'approved',
+                'submitted_at': '2024-01-16 14:20:00',
+                'documents': ['license.pdf']
             }
         ]
-    }
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps(applications).encode())
     
-    return {
-        'statusCode': 200,
-        'headers': {'Access-Control-Allow-Origin': '*'},
-        'body': json.dumps(stats)
-    }
-
-def handle_update_application_status(request):
-    """Update application status (approve/reject)"""
-    data = json.loads(request.body)
-    application_id = data.get('id')
-    new_status = data.get('status')
-    rejection_reason = data.get('rejection_reason', '')
-    
-    if not application_id or not new_status:
-        return {
-            'statusCode': 400,
-            'headers': {'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': 'Missing application ID or status'})
+    def handle_dashboard_stats(self):
+        """Get dashboard statistics for admin"""
+        stats = {
+            'total_applications': 15,
+            'pending_applications': 8,
+            'approved_applications': 5,
+            'rejected_applications': 2
         }
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps(stats).encode())
     
-    updated_application = {
-        'id': application_id,
-        'status': new_status,
-        'updated_at': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'rejection_reason': rejection_reason if new_status == 'rejected' else None
-    }
-    
-    return {
-        'statusCode': 200,
-        'headers': {'Access-Control-Allow-Origin': '*'},
-        'body': json.dumps(updated_application)
-    }
+    def handle_update_application_status(self):
+        """Update application status (approve/reject)"""
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            
+            application_id = data.get('id')
+            new_status = data.get('status')
+            
+            if not application_id or not new_status:
+                self.send_error(400, 'Missing application ID or status')
+                return
+            
+            updated_application = {
+                'id': application_id,
+                'status': new_status,
+                'updated_at': time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(updated_application).encode())
+            
+        except Exception as e:
+            self.send_error(500, str(e))
