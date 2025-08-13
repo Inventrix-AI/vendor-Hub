@@ -1,5 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService } from '@/lib/authService';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+// Hardcoded users for Vercel deployment (demo purposes)
+const DEMO_USERS = [
+  {
+    id: 1,
+    email: 'admin@vendorhub.com',
+    full_name: 'System Administrator',
+    role: 'super_admin',
+    password_hash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // admin123
+    is_active: 1
+  },
+  {
+    id: 2,
+    email: 'test@vendor.com',
+    full_name: 'Test Vendor',
+    role: 'vendor',
+    password_hash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // test123
+    is_active: 1
+  }
+];
+
+// Check if we're in Vercel environment
+const isVercelEnvironment = process.env.VERCEL || process.env.NODE_ENV === 'production';
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +79,35 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const result = await AuthService.login(loginEmail, password);
+        let result: { user: any; token: string } | null;
+        
+        if (isVercelEnvironment) {
+          // Use hardcoded users for Vercel deployment
+          const user = DEMO_USERS.find(u => u.email === loginEmail);
+          
+          if (!user || !await bcrypt.compare(password, user.password_hash)) {
+            return NextResponse.json(
+              { error: 'Invalid credentials' },
+              { status: 401 }
+            );
+          }
+
+          // Generate JWT token
+          const token = jwt.sign(
+            { 
+              userId: user.id, 
+              email: user.email, 
+              role: user.role 
+            },
+            process.env.JWT_SECRET || 'fallback-secret-key',
+            { expiresIn: '24h' }
+          );
+
+          result = { user, token };
+        } else {
+          // Use AuthService for local development
+          result = await AuthService.login(loginEmail, password);
+        }
         
         if (!result) {
           return NextResponse.json(
@@ -77,6 +130,7 @@ export async function POST(request: NextRequest) {
           token_type: 'bearer'
         });
       } catch (error) {
+        console.error('Login error:', error);
         return NextResponse.json(
           { error: 'Invalid credentials' },
           { status: 401 }
