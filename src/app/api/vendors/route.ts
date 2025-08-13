@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { IdGenerator } from '@/lib/vendorId';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +14,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate unique application ID
+    const applicationId = IdGenerator.applicationId();
+
     const application = {
-      id: Date.now(),
+      id: applicationId,
       company_name,
       contact_email,
       phone,
@@ -22,8 +26,31 @@ export async function POST(request: NextRequest) {
       business_description: data.business_description || '',
       status: 'pending',
       submitted_at: new Date().toISOString(),
-      documents: data.documents || []
+      documents: data.documents || [],
+      payment_status: 'pending',
+      payment_reference: null,
+      vendor_id: null // Will be generated after approval
     };
+
+    // Send application received notification
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'email',
+          recipient: contact_email,
+          templateId: 'application_received',
+          applicationId: applicationId,
+          data: {
+            vendorName: company_name,
+            applicationId: applicationId
+          }
+        })
+      });
+    } catch (notificationError) {
+      console.error('Failed to send notification:', notificationError);
+    }
 
     return NextResponse.json(application, { status: 201 });
   } catch (error) {

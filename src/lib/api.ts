@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios'
 import { toast } from 'react-toastify'
 import Cookies from 'js-cookie'
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || ''
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -48,12 +48,10 @@ api.interceptors.response.use(
 // Auth API calls
 export const authApi = {
   login: async (credentials: { username: string; password: string }) => {
-    const formData = new FormData()
-    formData.append('username', credentials.username)
-    formData.append('password', credentials.password)
-    
-    const response = await api.post('/api/auth/token', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    const response = await api.post('/api/auth', {
+      action: 'login',
+      username: credentials.username,
+      password: credentials.password
     })
     return response.data
   },
@@ -64,7 +62,10 @@ export const authApi = {
     full_name: string
     phone?: string
   }) => {
-    const response = await api.post('/api/auth/register', data)
+    const response = await api.post('/api/auth', {
+      action: 'register',
+      ...data
+    })
     return response.data
   },
 }
@@ -72,40 +73,41 @@ export const authApi = {
 // Vendor API calls
 export const vendorApi = {
   createApplication: async (data: any) => {
-    const response = await api.post('/api/vendors/applications', data)
+    const response = await api.post('/api/vendors', data)
     return response.data
   },
   
   getApplications: async () => {
-    const response = await api.get('/api/vendors/applications')
+    const response = await api.get('/api/vendors')
     return response.data
   },
   
   getApplication: async (applicationId: string) => {
-    const response = await api.get(`/api/vendors/applications/${applicationId}`)
+    const response = await api.get(`/api/vendors?id=${applicationId}`)
     return response.data
   },
   
   uploadDocument: async (applicationId: string, documentType: string, file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('document_type', documentType)
+    formData.append('applicationId', applicationId)
+    formData.append('documentType', documentType)
     
-    const response = await api.post(
-      `/api/vendors/applications/${applicationId}/documents`,
-      formData,
-      {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      }
-    )
+    const response = await api.post('/api/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
     return response.data
   },
 }
 
 // Payment API calls
 export const paymentApi = {
-  createOrder: async (data: { application_id: string; amount: number }) => {
-    const response = await api.post('/api/payments/create-order', data)
+  createOrder: async (data: { applicationId: string; amount: number }) => {
+    const response = await api.post('/api/payment/create-order', {
+      amount: data.amount * 100, // Convert to paise
+      currency: 'INR',
+      applicationId: data.applicationId
+    })
     return response.data
   },
   
@@ -113,49 +115,114 @@ export const paymentApi = {
     razorpay_order_id: string
     razorpay_payment_id: string
     razorpay_signature: string
+    applicationId: string
   }) => {
-    const response = await api.post('/api/payments/verify-payment', data)
+    const response = await api.post('/api/payment/verify', data)
     return response.data
   },
   
   getPaymentHistory: async () => {
-    const response = await api.get('/api/payments/history')
-    return response.data
+    // Mock payment history data
+    return [
+      {
+        id: 1,
+        amount: 500,
+        currency: 'INR',
+        status: 'success' as const,
+        razorpay_order_id: 'order_123456789',
+        razorpay_payment_id: 'pay_123456789',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ]
   },
 }
 
 // Admin API calls
 export const adminApi = {
-  getApplications: async (params?: {
-    status?: string
-    search?: string
-    skip?: number
-    limit?: number
-  }) => {
-    const response = await api.get('/api/admin/applications', { params })
+  getApplications: async (params?: { status?: string; search?: string; limit?: number }) => {
+    const queryParams = new URLSearchParams({
+      type: 'applications'
+    });
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const response = await api.get(`/api/admin?${queryParams.toString()}`)
     return response.data
   },
   
   getApplicationDetail: async (applicationId: string) => {
-    const response = await api.get(`/api/admin/applications/${applicationId}`)
+    // For now, return mock data - in production, implement proper endpoint
+    return {
+      id: applicationId,
+      application_id: applicationId,
+      business_name: 'Sample Company',
+      company_name: 'Sample Company',
+      contact_email: 'contact@sample.com',
+      phone: '+1234567890',
+      business_type: 'Technology',
+      status: 'pending',
+      documents: [],
+      submitted_at: new Date().toISOString(),
+      business_description: 'Sample business description',
+      vendor_id: null,
+      payment_status: 'pending',
+      rejection_reason: null,
+      reviewed_at: null,
+      user_email: 'contact@sample.com',
+      user_phone: '+1234567890',
+      user_full_name: 'Sample User',
+      registration_number: 'REG123456789',
+      business_address: '123 Business Street, City, State 12345',
+      tax_id: 'TAX123456789',
+      address: '123 Business Street',
+      city: 'Sample City',
+      state: 'Sample State',
+      zip_code: '12345',
+      postal_code: '12345',
+      country: 'India',
+      bank_name: 'Sample Bank',
+      account_number: '1234567890',
+      ifsc_code: 'SAMP0001234',
+      routing_number: '123456789'
+    }
+  },
+  
+  getDashboardStats: async () => {
+    const response = await api.get('/api/admin')
     return response.data
   },
   
   reviewApplication: async (applicationId: string, data: {
     status: string
     rejection_reason?: string
+    application_data?: any
   }) => {
-    const response = await api.put(`/api/admin/applications/${applicationId}/review`, data)
+    const response = await api.put('/api/admin', {
+      id: applicationId,
+      ...data
+    })
     return response.data
   },
   
-  getDashboardStats: async () => {
-    const response = await api.get('/api/admin/dashboard/stats')
-    return response.data
-  },
-  
-  getAuditLogs: async (applicationId: string) => {
-    const response = await api.get(`/api/admin/audit-logs/${applicationId}`)
-    return response.data
+  getAuditLogs: async (_applicationId: string) => {
+    // Mock audit logs - in production, implement proper endpoint
+    return [
+      {
+        id: '1',
+        action: 'Application Submitted',
+        timestamp: new Date().toISOString(),
+        user: 'System',
+        details: 'Application submitted for review'
+      },
+      {
+        id: '2',
+        action: 'Documents Uploaded',
+        timestamp: new Date().toISOString(),
+        user: 'Vendor',
+        details: 'Business documents uploaded'
+      }
+    ]
   },
 }

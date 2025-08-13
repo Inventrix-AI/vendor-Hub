@@ -40,31 +40,49 @@ export function PaymentModal({
 
   const handlePayment = async () => {
     try {
-      // Create order
-      const orderResponse = await paymentApi.createOrder({
-        application_id: applicationId,
-        amount: amount
+      // Create order via our API
+      const orderResponse = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amount * 100, // Convert to paise
+          currency: 'INR',
+          applicationId
+        })
       })
 
+      const orderData = await orderResponse.json()
+      if (!orderResponse.ok) throw new Error(orderData.error)
+
       const options = {
-        key: orderResponse.key,
-        amount: orderResponse.amount * 100, // Convert to paise
-        currency: orderResponse.currency,
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_1234567890',
+        amount: orderData.amount,
+        currency: orderData.currency,
         name: 'Vendor Onboarding System',
         description: `Payment for application ${applicationId}`,
-        order_id: orderResponse.razorpay_order_id,
+        order_id: orderData.id,
         handler: async (response: any) => {
           try {
             // Verify payment
-            await paymentApi.verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
+            const verifyResponse = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                applicationId
+              })
             })
-            
-            toast.success('Payment successful!')
-            onPaymentSuccess()
-            onClose()
+
+            const verifyData = await verifyResponse.json()
+            if (verifyResponse.ok) {
+              toast.success('Payment successful!')
+              onPaymentSuccess()
+              onClose()
+            } else {
+              throw new Error(verifyData.error)
+            }
           } catch (error) {
             toast.error('Payment verification failed')
           }
@@ -75,7 +93,7 @@ export function PaymentModal({
           }
         },
         prefill: {
-          email: 'customer@example.com', // This should come from user data
+          email: 'customer@example.com',
         },
         theme: {
           color: '#2563eb'

@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
-    const { id, status } = data;
+    const { id, status, rejection_reason, application_data } = data;
 
     if (!id || !status) {
       return NextResponse.json(
@@ -52,11 +52,68 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updatedApplication = {
+    let updatedApplication: any = {
       id,
       status,
       updated_at: new Date().toISOString()
     };
+
+    // If approved, generate vendor ID
+    if (status === 'approved' && application_data) {
+      const { IdGenerator } = await import('@/lib/vendorId');
+      const vendorId = IdGenerator.vendorId(
+        application_data.company_name,
+        application_data.business_type
+      );
+      
+      updatedApplication.vendor_id = vendorId;
+
+      // Send approval notification
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'email',
+            recipient: application_data.contact_email,
+            templateId: 'application_approved',
+            applicationId: id,
+            data: {
+              vendorName: application_data.company_name,
+              applicationId: id,
+              vendorId: vendorId
+            }
+          })
+        });
+      } catch (notificationError) {
+        console.error('Failed to send approval notification:', notificationError);
+      }
+    }
+
+    // If rejected, send rejection notification
+    if (status === 'rejected' && application_data) {
+      updatedApplication.rejection_reason = rejection_reason || 'Application requirements not met';
+
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'email',
+            recipient: application_data.contact_email,
+            templateId: 'application_rejected',
+            applicationId: id,
+            data: {
+              vendorName: application_data.company_name,
+              applicationId: id,
+              rejectionReason: updatedApplication.rejection_reason
+            }
+          })
+        });
+      } catch (notificationError) {
+        console.error('Failed to send rejection notification:', notificationError);
+      }
+    }
 
     return NextResponse.json(updatedApplication);
   } catch (error) {
