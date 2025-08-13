@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IdGenerator } from '@/lib/vendorId';
+import { VendorApplicationDB, AuditLogDB } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,13 +18,46 @@ export async function POST(request: NextRequest) {
     // Generate unique application ID
     const applicationId = IdGenerator.applicationId();
 
-    const application = {
-      id: applicationId,
+    // For now, using a mock user ID (1) - in production, get from JWT token
+    const userId = 1;
+
+    const applicationData = {
+      application_id: applicationId,
+      user_id: userId,
       company_name,
       contact_email,
       phone,
       business_type,
       business_description: data.business_description || '',
+      registration_number: data.registration_number,
+      tax_id: data.tax_id,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      postal_code: data.postal_code,
+      country: data.country,
+      bank_name: data.bank_name,
+      account_number: data.account_number,
+      ifsc_code: data.ifsc_code,
+      routing_number: data.routing_number
+    };
+
+    // Save to database
+    const result = VendorApplicationDB.create(applicationData);
+    
+    // Log the action
+    AuditLogDB.create({
+      application_id: result.lastInsertRowid as number,
+      user_id: userId,
+      action: 'Application Submitted',
+      entity_type: 'application',
+      entity_id: result.lastInsertRowid as number,
+      new_values: applicationData
+    });
+
+    const application = {
+      id: applicationId,
+      ...applicationData,
       status: 'pending',
       submitted_at: new Date().toISOString(),
       documents: data.documents || [],
@@ -61,30 +95,23 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
-  // Mock data for demo
-  const vendors = [
-    {
-      id: 1,
-      company_name: 'Tech Solutions Inc',
-      contact_email: 'contact@techsolutions.com',
-      phone: '+1234567890',
-      business_type: 'Technology',
-      status: 'approved',
-      submitted_at: '2024-01-15T10:30:00Z'
-    },
-    {
-      id: 2,
-      company_name: 'Green Supplies Co',
-      contact_email: 'info@greensupplies.com',
-      phone: '+1234567891',
-      business_type: 'Environmental',
-      status: 'pending',
-      submitted_at: '2024-01-16T14:20:00Z'
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const applicationId = searchParams.get('id');
+  
+  if (applicationId) {
+    // Get specific application
+    const application = VendorApplicationDB.findByApplicationId(applicationId);
+    if (!application) {
+      return NextResponse.json({ error: 'Application not found' }, { status: 404 });
     }
-  ];
-
-  return NextResponse.json(vendors);
+    return NextResponse.json(application);
+  }
+  
+  // Get all applications for the user (mock user ID 1 for now)
+  const userId = 1;
+  const applications = VendorApplicationDB.findByUserId(userId);
+  return NextResponse.json(applications);
 }
 
 export async function PUT(request: NextRequest) {

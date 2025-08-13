@@ -1,42 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { VendorApplicationDB } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
 
   if (type === 'applications') {
-    const applications = [
-      {
-        id: 1,
-        company_name: 'Tech Solutions Inc',
-        contact_email: 'contact@techsolutions.com',
-        business_type: 'Technology',
-        status: 'pending',
-        submitted_at: '2024-01-15T10:30:00Z',
-        documents: ['business_license.pdf', 'tax_certificate.pdf']
-      },
-      {
-        id: 2,
-        company_name: 'Green Supplies Co',
-        contact_email: 'info@greensupplies.com',
-        business_type: 'Environmental',
-        status: 'approved',
-        submitted_at: '2024-01-16T14:20:00Z',
-        documents: ['license.pdf']
-      }
-    ];
-
+    const status = searchParams.get('status');
+    const search = searchParams.get('search');
+    const limit = searchParams.get('limit');
+    
+    const filters: any = {};
+    if (status) filters.status = status;
+    if (search) filters.search = search;
+    if (limit) filters.limit = parseInt(limit);
+    
+    const applications = VendorApplicationDB.findAll(filters);
     return NextResponse.json(applications);
   }
 
   // Default: dashboard stats
-  const stats = {
-    total_applications: 15,
-    pending_applications: 8,
-    approved_applications: 5,
-    rejected_applications: 2
-  };
-
+  const stats = VendorApplicationDB.getStats();
   return NextResponse.json(stats);
 }
 
