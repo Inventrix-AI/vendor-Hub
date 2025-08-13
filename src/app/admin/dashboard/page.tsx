@@ -5,18 +5,30 @@ import { useQuery } from 'react-query'
 import Link from 'next/link'
 import { Layout } from '@/components/Layout'
 import { adminApi } from '@/lib/api'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { 
   FileText,
   Clock,
   CheckCircle,
   XCircle,
-  Users,
   TrendingUp,
   Eye
 } from 'lucide-react'
 import { DashboardStats } from '@/types'
 
 export default function AdminDashboard() {
+  const { loading: authLoading, isAuthorized } = useAuthGuard({
+    requiredRole: ['admin', 'super_admin', 'reviewer']
+  })
+
+  // Show loading spinner while checking authentication
+  if (authLoading || !isAuthorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="spinner" />
+      </div>
+    )
+  }
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>(
     'dashboard-stats',
     adminApi.getDashboardStats

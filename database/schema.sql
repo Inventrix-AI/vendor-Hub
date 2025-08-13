@@ -145,9 +145,13 @@ CREATE INDEX idx_audit_logs_application_id ON audit_logs(application_id);
 CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX idx_users_email ON users(email);
 
--- Insert default admin user
+-- Insert default admin user (password: admin123)
 INSERT INTO users (email, password_hash, full_name, role, is_active) 
-VALUES ('admin@vendorsystem.com', '$2b$10$example_hash_replace_in_production', 'System Administrator', 'super_admin', 1);
+VALUES ('admin@vendorhub.com', '$2b$12$gjyHZe9lEeEVnqS.E5gvruyYlRBB3oXSpYm5uDOtXB3qF.amu2cVC', 'System Administrator', 'super_admin', 1);
+
+-- Insert test vendor user (password: test123)
+INSERT INTO users (email, password_hash, full_name, role, is_active) 
+VALUES ('test@vendor.com', '$2b$12$7zND/poUeC8mGF1JmXkFAuT0nqaxpKfhpPTjurv2W7nHkSEqJ1NYa', 'Test Vendor', 'vendor', 1);
 
 -- Insert default admin settings
 INSERT INTO admin_settings (setting_key, setting_value, description) VALUES

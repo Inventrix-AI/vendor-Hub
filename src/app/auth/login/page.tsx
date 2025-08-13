@@ -32,10 +32,14 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   React.useEffect(() => {
+    console.log('Login page useEffect triggered, user:', user)
     if (user) {
+      console.log('User found, redirecting based on role:', user.role)
       if (user.role === 'vendor') {
+        console.log('Redirecting to vendor dashboard')
         router.push('/vendor/dashboard')
-      } else if (user.role === 'admin' || user.role === 'reviewer') {
+      } else if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'reviewer') {
+        console.log('Redirecting to admin dashboard')
         router.push('/admin/dashboard')
       }
     }
@@ -43,12 +47,17 @@ export default function LoginPage() {
 
   const onSubmit = async (data: FormData) => {
     try {
+      console.log('Login form submitted with:', { email: data.email })
       setLoading(true)
+      
+      console.log('Calling login function...')
       await login({ username: data.email, password: data.password })
       
-      // Redirect will happen automatically via useEffect above
+      console.log('Login function completed successfully')
+      // Note: Redirect will happen automatically via useEffect when user state updates
     } catch (error) {
       console.error('Login failed:', error)
+      alert('Login failed: ' + (error as any)?.message || 'Unknown error')
     } finally {
       setLoading(false)
     }

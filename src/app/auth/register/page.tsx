@@ -43,7 +43,7 @@ export default function RegisterPage() {
     if (user) {
       if (user.role === 'vendor') {
         router.push('/vendor/dashboard')
-      } else if (user.role === 'admin' || user.role === 'reviewer') {
+      } else if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'reviewer') {
         router.push('/admin/dashboard')
       }
     }

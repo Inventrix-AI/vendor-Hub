@@ -2,7 +2,7 @@ export interface User {
   id: number
   email: string
   full_name: string
-  role: 'vendor' | 'admin' | 'reviewer'
+  role: 'vendor' | 'admin' | 'super_admin' | 'reviewer'
   is_active: boolean
   phone?: string
 }

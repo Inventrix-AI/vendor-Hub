@@ -46,26 +46,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (credentials: { username: string; password: string }) => {
     try {
+      console.log('AuthContext login called with:', { username: credentials.username })
       const response = await authApi.login(credentials)
+      console.log('AuthAPI login response:', response)
       
       // Store token
       Cookies.set('access_token', response.access_token, { expires: 1 }) // 1 day
+      console.log('Token stored in cookie')
       
-      // Decode JWT to get user info (simple approach)
-      const tokenPayload = JSON.parse(atob(response.access_token.split('.')[1]))
+      // Use user data from API response
       const userData: User = {
-        id: 0, // This should come from a separate API call in production
-        email: tokenPayload.sub,
-        full_name: tokenPayload.sub, // This should be fetched properly
-        role: tokenPayload.role,
-        is_active: true,
+        id: response.user.id,
+        email: response.user.email,
+        full_name: response.user.full_name,
+        role: response.user.role,
+        is_active: response.user.is_active,
       }
       
       localStorage.setItem('user', JSON.stringify(userData))
       setUser(userData)
+      console.log('User data stored and state updated:', userData)
       
       toast.success('Login successful!')
+      
+      // Let the login page handle redirection via useEffect
     } catch (error) {
+      console.error('Auth context login error:', error)
+      toast.error('Invalid credentials')
       throw error
     }
   }
@@ -79,11 +86,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await authApi.register(data)
       
-      // Auto-login after registration
-      await login({ username: data.email, password: data.password })
+      // If registration returns user and token, use them directly
+      if (response.user && response.access_token) {
+        // Store token
+        Cookies.set('access_token', response.access_token, { expires: 1 })
+        
+        // Use user data from API response
+        const userData: User = {
+          id: response.user.id,
+          email: response.user.email,
+          full_name: response.user.full_name,
+          role: response.user.role,
+          is_active: response.user.is_active,
+        }
+        
+        localStorage.setItem('user', JSON.stringify(userData))
+        setUser(userData)
+        
+        // Let the registration page handle redirection if needed
+      }
       
       toast.success('Registration successful!')
     } catch (error) {
+      if ((error as any)?.response?.status === 409) {
+        toast.error('User already exists')
+      } else {
+        toast.error('Registration failed')
+      }
       throw error
     }
   }

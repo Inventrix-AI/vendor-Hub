@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login Test</title>
+    <script src="https://unpkg.com/js-cookie@3/dist/js.cookie.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <h2>Login Test</h2>
+    <div id="result"></div>
+    <button onclick="testLogin()">Test Admin Login</button>
+    <button onclick="testRedirect()">Test Dashboard Access</button>
+    <button onclick="clearAuth()">Clear Auth</button>
+
+    <script>
+    function log(message) {
+        document.getElementById('result').innerHTML += '<p>' + message + '</p>';
+        console.log(message);
+    }
+
+    async function testLogin() {
+        log('Testing admin login...');
+        try {
+            const response = await axios.post('http://localhost:3002/api/auth', {
+                action: 'login',
+                email: 'admin@vendorhub.com',
+                password: 'admin123'
+            });
+            
+            log('Login API response: ' + JSON.stringify(response.data));
+            
+            // Set cookie like the frontend does
+            Cookies.set('access_token', response.data.access_token, { expires: 1 });
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            
+            log('✅ Cookie set: ' + Cookies.get('access_token'));
+            log('✅ User data stored: ' + localStorage.getItem('user'));
+            
+        } catch (error) {
+            log('❌ Login failed: ' + error.message);
+        }
+    }
+
+    async function testRedirect() {
+        log('Testing dashboard access...');
+        const token = Cookies.get('access_token');
+        if (token) {
+            log('✅ Token found: ' + token);
+            // Open admin dashboard in new tab
+            window.open('http://localhost:3002/admin/dashboard', '_blank');
+        } else {
+            log('❌ No token found');
+        }
+    }
+
+    function clearAuth() {
+        Cookies.remove('access_token');
+        localStorage.removeItem('user');
+        log('🧹 Auth cleared');
+    }
+    </script>
+</body>
+</html>
