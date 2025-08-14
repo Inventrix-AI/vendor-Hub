@@ -1,4 +1,4 @@
-import { UserDB } from './database';
+import { UserDB } from './db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
@@ -56,7 +56,7 @@ export class AuthService {
   }
 
   static async login(email: string, password: string): Promise<{ user: User; token: string } | null> {
-    const user = UserDB.findByEmail(email) as User | undefined;
+    const user = await UserDB.findByEmail(email) as User | undefined;
     
     if (!user || !user.is_active) {
       return null;
@@ -85,22 +85,20 @@ export class AuthService {
     phone?: string;
     role?: UserRole;
   }): Promise<{ user: User; token: string }> {
-    const existingUser = UserDB.findByEmail(userData.email);
+    const existingUser = await UserDB.findByEmail(userData.email);
     if (existingUser) {
       throw new Error('User already exists');
     }
 
     const hashedPassword = await this.hashPassword(userData.password);
     
-    const result = UserDB.create({
+    const user = await UserDB.create({
       email: userData.email,
       password_hash: hashedPassword,
       full_name: userData.full_name,
       phone: userData.phone,
       role: userData.role || 'vendor'
-    });
-
-    const user = UserDB.findById(result.lastInsertRowid as number) as User;
+    }) as User;
     const token = this.generateToken(user);
 
     return { user, token };

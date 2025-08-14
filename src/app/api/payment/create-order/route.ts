@@ -3,11 +3,25 @@ import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
-    const { amount, currency = 'INR', applicationId } = await request.json();
+    const { amount, currency = 'INR', applicationId, vendorId, paymentType = 'initial' } = await request.json();
 
-    if (!amount || !applicationId) {
+    if (!amount) {
       return NextResponse.json(
-        { error: 'Amount and application ID are required' },
+        { error: 'Amount is required' },
+        { status: 400 }
+      );
+    }
+
+    if (paymentType === 'initial' && !applicationId) {
+      return NextResponse.json(
+        { error: 'Application ID is required for initial payments' },
+        { status: 400 }
+      );
+    }
+
+    if (paymentType === 'renewal' && !vendorId) {
+      return NextResponse.json(
+        { error: 'Vendor ID is required for renewal payments' },
         { status: 400 }
       );
     }
@@ -17,13 +31,18 @@ export async function POST(request: NextRequest) {
     const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || 'test_secret_key_1234567890';
 
     // Create Razorpay order
+    const identifier = applicationId || vendorId;
+    const purpose = paymentType === 'renewal' ? 'vendor_renewal_fee' : 'vendor_onboarding_fee';
+    
     const orderData = {
       amount: amount, // amount in paise
       currency: currency,
-      receipt: `receipt_${applicationId}_${Date.now()}`,
+      receipt: `receipt_${identifier}_${Date.now()}`,
       notes: {
-        applicationId: applicationId,
-        purpose: 'vendor_onboarding_fee'
+        applicationId: applicationId || null,
+        vendorId: vendorId || null,
+        paymentType: paymentType,
+        purpose: purpose
       }
     };
 

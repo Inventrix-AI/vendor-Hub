@@ -1,14 +1,22 @@
 'use client'
 
-import React, { useState } from 'react'
-import { X, ZoomIn, ZoomOut, Download, Eye } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, ZoomIn, ZoomOut, Download, Eye, RotateCw, Maximize, Minimize, Grid, FileText } from 'lucide-react'
 
 interface Document {
-  id: string
-  name: string
-  type: string
-  url: string
+  id: string | number
+  documentReference?: string
+  originalName?: string
+  name?: string
+  fileName?: string
+  type?: string
+  fileType?: string
+  url?: string
+  filePath?: string
+  documentName?: string
+  documentDescription?: string
   uploadedAt: string
+  fileSize?: number
 }
 
 interface DocumentViewerProps {
@@ -19,11 +27,68 @@ interface DocumentViewerProps {
 
 export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerProps) {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(100)
+  const [rotation, setRotation] = useState(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [compareMode, setCompareMode] = useState(false)
   const [compareDocuments, setCompareDocuments] = useState<Document[]>([])
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.target && (event.target as HTMLElement).tagName === 'INPUT') return
+
+      switch (event.key) {
+        case 'Escape':
+          onClose()
+          break
+        case '=':
+        case '+':
+          event.preventDefault()
+          handleZoomIn()
+          break
+        case '-':
+          event.preventDefault()
+          handleZoomOut()
+          break
+        case 'r':
+        case 'R':
+          event.preventDefault()
+          handleRotate()
+          break
+        case 'f':
+        case 'F':
+          event.preventDefault()
+          setIsFullscreen(!isFullscreen)
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isFullscreen, onClose])
+
   if (!isOpen) return null
+
+  // Helper functions to get document properties
+  const getDocumentName = (doc: Document) => 
+    doc.documentName || doc.name || doc.originalName || doc.fileName || 'Unknown Document'
+  
+  const getDocumentUrl = (doc: Document) => 
+    doc.filePath || doc.url || ''
+  
+  const getDocumentType = (doc: Document) => 
+    doc.fileType || doc.type || ''
+
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 300))
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 25))
+  const handleRotate = () => setRotation(prev => (prev + 90) % 360)
+  const resetView = () => {
+    setZoom(100)
+    setRotation(0)
+  }
 
   const handleDocumentSelect = (doc: Document) => {
     if (compareMode && compareDocuments.length < 2 && !compareDocuments.find(d => d.id === doc.id)) {
@@ -41,52 +106,68 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
     setSelectedDocument(null)
   }
 
-  const removeFromCompare = (docId: string) => {
+  const removeFromCompare = (docId: string | number) => {
     setCompareDocuments(compareDocuments.filter(d => d.id !== docId))
   }
 
   const downloadDocument = (doc: Document) => {
-    // Create download link
     const link = document.createElement('a')
-    link.href = doc.url
-    link.download = doc.name
+    link.href = getDocumentUrl(doc)
+    link.download = doc.originalName || doc.fileName || getDocumentName(doc)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
-  const renderImageViewer = (doc: Document, className = '') => (
-    <div className={`relative ${className}`}>
-      <div className="bg-gray-100 rounded-lg overflow-hidden">
-        <img
-          src={doc.url}
-          alt={doc.name}
-          className="w-full h-auto"
-          style={{ transform: `scale(${zoom})` }}
-        />
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return ''
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    if (bytes === 0) return '0 Byte'
+    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)).toString())
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+  }
+
+  const renderImageViewer = (doc: Document, className = '') => {
+    const isImage = getDocumentType(doc).startsWith('image/')
+    
+    return (
+      <div className={`relative ${className} flex items-center justify-center min-h-96 bg-gray-50 rounded-lg overflow-hidden`}>
+        {isImage ? (
+          <div className="relative">
+            <img
+              src={getDocumentUrl(doc)}
+              alt={getDocumentName(doc)}
+              className="max-w-none shadow-lg rounded-md cursor-pointer"
+              style={{
+                transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                transformOrigin: 'center',
+                transition: 'transform 0.2s ease-in-out'
+              }}
+              onDoubleClick={resetView}
+              draggable={false}
+            />
+          </div>
+        ) : (
+          <div className="text-center p-8">
+            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {getDocumentName(doc)}
+            </h3>
+            <p className="text-gray-500 mb-4">
+              This file type cannot be previewed
+            </p>
+            <button
+              onClick={() => downloadDocument(doc)}
+              className="btn-primary flex items-center space-x-2 mx-auto"
+            >
+              <Download className="h-4 w-4" />
+              <span>Download File</span>
+            </button>
+          </div>
+        )}
       </div>
-      <div className="absolute top-4 right-4 flex space-x-2">
-        <button
-          onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
-          className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50"
-        >
-          <ZoomOut className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => setZoom(Math.min(3, zoom + 0.25))}
-          className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50"
-        >
-          <ZoomIn className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => downloadDocument(doc)}
-          className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50"
-        >
-          <Download className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  )
+    )
+  }
 
   const renderPDFViewer = (doc: Document, className = '') => (
     <div className={`${className}`}>
@@ -108,29 +189,97 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
   )
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-6xl w-full h-5/6 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+    <div className={`fixed inset-0 z-50 ${isFullscreen ? 'bg-black' : 'bg-black bg-opacity-75'} flex items-center justify-center p-4`}>
+      <div className={`${isFullscreen ? 'w-full h-full' : 'max-w-7xl max-h-full w-full'} bg-white rounded-lg shadow-2xl flex flex-col`}>
+        {/* Enhanced Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
           <div className="flex items-center space-x-4">
-            <h2 className="text-xl font-bold">Document Viewer</h2>
+            <h2 className="text-xl font-bold text-gray-900">Document Viewer</h2>
+            <div className="text-sm text-gray-500">
+              {documents.length} document{documents.length !== 1 ? 's' : ''}
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={toggleCompareMode}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  compareMode
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Grid className="h-4 w-4 mr-1 inline" />
+                {compareMode ? 'Exit Compare' : 'Compare'}
+              </button>
+            </div>
+          </div>
+
+          {/* Enhanced Controls */}
+          <div className="flex items-center space-x-2">
+            {selectedDocument && getDocumentType(selectedDocument).startsWith('image/') && (
+              <>
+                <button
+                  onClick={handleZoomOut}
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+                  title="Zoom Out (-)"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </button>
+                
+                <span className="text-sm text-gray-600 px-2 min-w-[60px] text-center">
+                  {zoom}%
+                </span>
+                
+                <button
+                  onClick={handleZoomIn}
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+                  title="Zoom In (+)"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+
+                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+
+                <button
+                  onClick={handleRotate}
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+                  title="Rotate (R)"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </button>
+
+                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+              </>
+            )}
+
+            {selectedDocument && (
+              <button
+                onClick={() => downloadDocument(selectedDocument)}
+                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+                title="Download"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            )}
+
             <button
-              onClick={toggleCompareMode}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                compareMode
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+              title={isFullscreen ? "Exit Fullscreen (F)" : "Fullscreen (F)"}
             >
-              {compareMode ? 'Exit Compare Mode' : 'Compare Documents'}
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </button>
+
+            <div className="w-px h-6 bg-gray-300 mx-2"></div>
+
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+              title="Close (ESC)"
+            >
+              <X className="h-4 w-4" />
             </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-6 w-6" />
-          </button>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
@@ -245,6 +394,37 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
             )}
           </div>
         </div>
+
+        {/* Footer with keyboard shortcuts */}
+        {selectedDocument && getDocumentType(selectedDocument).startsWith('image/') && (
+          <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center space-x-4">
+                <span>Double-click image to reset view</span>
+                <span>•</span>
+                <span>Use mouse wheel to zoom</span>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-1">
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs">+/-</kbd>
+                  <span>zoom</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs">R</kbd>
+                  <span>rotate</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs">F</kbd>
+                  <span>fullscreen</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs">ESC</kbd>
+                  <span>close</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

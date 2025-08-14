@@ -13,9 +13,105 @@ import {
   CheckCircle, 
   XCircle, 
   CreditCard,
-  Eye
+  Eye,
+  Calendar,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react'
 import { VendorApplication, Payment } from '@/types'
+
+// Subscription status component
+function SubscriptionStatusCard({ vendorId }: { vendorId?: string }) {
+  const { data: subscriptionStatus, isLoading } = useQuery(
+    ['subscription-status', vendorId],
+    async () => {
+      if (!vendorId) return null
+      const response = await fetch(`/api/renewal?vendorId=${vendorId}&action=status`)
+      if (!response.ok) return null
+      return response.json()
+    },
+    { enabled: !!vendorId }
+  )
+
+  if (isLoading || !subscriptionStatus) {
+    return (
+      <div className="card">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-300 rounded w-1/4 mb-2"></div>
+          <div className="h-8 bg-gray-300 rounded w-1/2"></div>
+        </div>
+      </div>
+    )
+  }
+
+  const getStatusColor = (status: string, daysLeft: number) => {
+    if (status === 'expired') return 'bg-red-50 border-red-200 text-red-900'
+    if (status === 'expiring_soon' || daysLeft <= 30) return 'bg-yellow-50 border-yellow-200 text-yellow-900'
+    return 'bg-green-50 border-green-200 text-green-900'
+  }
+
+  const getStatusIcon = (status: string, daysLeft: number) => {
+    if (status === 'expired') return <XCircle className="h-6 w-6 text-red-500" />
+    if (status === 'expiring_soon' || daysLeft <= 30) return <AlertTriangle className="h-6 w-6 text-yellow-500" />
+    return <CheckCircle className="h-6 w-6 text-green-500" />
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'active': return 'Active'
+      case 'expiring_soon': return 'Expiring Soon'
+      case 'expired': return 'Expired'
+      case 'no_subscription': return 'No Subscription'
+      default: return 'Unknown'
+    }
+  }
+
+  return (
+    <div className={`card border-2 ${getStatusColor(subscriptionStatus.status, subscriptionStatus.daysUntilExpiry)}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center space-x-3">
+          {getStatusIcon(subscriptionStatus.status, subscriptionStatus.daysUntilExpiry)}
+          <div>
+            <h3 className="text-lg font-semibold">Subscription Status</h3>
+            <p className="text-sm opacity-75">
+              {getStatusText(subscriptionStatus.status)}
+            </p>
+          </div>
+        </div>
+        
+        {subscriptionStatus.status !== 'no_subscription' && (
+          <div className="text-right">
+            <div className="text-2xl font-bold">
+              {subscriptionStatus.daysUntilExpiry}
+            </div>
+            <div className="text-xs opacity-75">days left</div>
+          </div>
+        )}
+      </div>
+
+      {subscriptionStatus.expiresAt && (
+        <div className="mt-4 pt-4 border-t border-current border-opacity-20">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span>Expires: {new Date(subscriptionStatus.expiresAt).toLocaleDateString()}</span>
+            </div>
+            
+            {(subscriptionStatus.status === 'expiring_soon' || subscriptionStatus.status === 'expired') && (
+              <Link 
+                href={`/vendor/renewal?vendor_id=${vendorId}`}
+                className="flex items-center space-x-1 px-3 py-1 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition-colors"
+              >
+                <RefreshCw className="h-3 w-3" />
+                <span>Renew Now</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function VendorDashboard() {
   const { user } = useAuth()
@@ -24,6 +120,10 @@ export default function VendorDashboard() {
     'vendor-applications',
     vendorApi.getApplications
   )
+
+  // Get vendor ID from approved applications
+  const approvedApplication = applications?.find(app => app.status === 'approved' && app.vendor_id)
+  const vendorId = approvedApplication?.vendor_id
   
   const { data: payments, isLoading: paymentsLoading } = useQuery<Payment[]>(
     'payment-history',
@@ -82,6 +182,9 @@ export default function VendorDashboard() {
             </Link>
           </div>
         </div>
+
+        {/* Subscription Status - Only show if vendor has an approved application */}
+        {vendorId && <SubscriptionStatusCard vendorId={vendorId} />}
 
         {/* Applications Section */}
         <div className="card">
