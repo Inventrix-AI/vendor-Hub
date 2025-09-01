@@ -110,11 +110,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`Payment verified for application ${application_id}`);
 
+    // Get the updated application with vendor_id
+    const updatedApplication = await VendorApplicationDB.findByApplicationId(application_id);
+
     return NextResponse.json({
       success: true,
       message: 'Payment verified successfully',
       paymentId: razorpay_payment_id,
       applicationId: application_id,
+      vendorId: updatedApplication?.vendor_id,
+      email: updatedApplication?.email,
+      temporaryPassword: updatedApplication?.temporary_password,
       status: 'under_review'
     });
 

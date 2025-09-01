@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { executeQuery } from '@/lib/db';
+import { SupabaseStorageService } from '@/lib/supabase-storage';
 
 // Document type definitions with specific requirements
 const DOCUMENT_TYPES = {
@@ -114,15 +113,13 @@ export async function POST(request: NextRequest) {
     const documentReference = `DOC_${uuidv4().toUpperCase()}`;
     const fileName = `${documentReference}.${fileExtension}`;
     
-    // Create uploads directory structure
-    const uploadsDir = join(process.cwd(), 'uploads', applicationId);
-    await mkdir(uploadsDir, { recursive: true });
-    
-    // Save file
-    const filePath = join(uploadsDir, fileName);
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
+    // Upload to Supabase Storage
+    const uploadResult = await SupabaseStorageService.uploadDocument(
+      applicationId,
+      documentType,
+      file,
+      fileName
+    );
 
     // Get application internal ID
     const applicationResult = await executeQuery(`
@@ -141,18 +138,19 @@ export async function POST(request: NextRequest) {
     const documentResult = await executeQuery(`
       INSERT INTO documents (
         document_reference, application_id, document_type, file_name, file_path,
-        file_size, mime_type, version, is_current, uploaded_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1, true, $8)
+        file_size, mime_type, version, is_current, uploaded_by, storage_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1, true, $8, $9)
       RETURNING id
     `, [
       documentReference,
       applicationRow.id,
       documentType,
       fileName,
-      `/uploads/${applicationId}/${fileName}`,
+      uploadResult.path, // Supabase storage path
       file.size,
       file.type,
-      applicationRow.user_id
+      applicationRow.user_id,
+      uploadResult.publicUrl // Store the public URL for easy access
     ]);
     const documentId = documentResult.rows[0].id;
 
@@ -162,7 +160,8 @@ export async function POST(request: NextRequest) {
       documentReference: documentReference,
       originalName: file.name,
       fileName: fileName,
-      filePath: `/uploads/${applicationId}/${fileName}`,
+      filePath: uploadResult.path,
+      storageUrl: uploadResult.publicUrl,
       fileSize: file.size,
       fileType: file.type,
       documentType: documentType,
@@ -217,7 +216,8 @@ export async function GET(request: NextRequest) {
         d.file_size as "fileSize",
         d.mime_type as "fileType",
         d.document_type as "documentType",
-        d.uploaded_at as "uploadedAt"
+        d.uploaded_at as "uploadedAt",
+        d.storage_url as "storageUrl"
       FROM documents d
       JOIN vendor_applications va ON d.application_id = va.id
       WHERE va.application_id = $1 AND d.is_current = true

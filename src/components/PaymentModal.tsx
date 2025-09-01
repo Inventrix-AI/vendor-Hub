@@ -137,6 +137,20 @@ export function PaymentModal({
             const verifyData = await verifyResponse.json()
             if (verifyResponse.ok) {
               toast.success('Payment successful!')
+              
+              // If we have credentials, redirect to success page
+              if (verifyData.vendorId && verifyData.email && verifyData.temporaryPassword) {
+                const successParams = new URLSearchParams({
+                  applicationId: verifyData.applicationId,
+                  vendorId: verifyData.vendorId,
+                  email: verifyData.email,
+                  password: verifyData.temporaryPassword,
+                  paymentId: verifyData.paymentId,
+                })
+                window.location.href = `/vendor/success?${successParams.toString()}`
+                return
+              }
+              
               onPaymentSuccess()
               onClose()
             } else {

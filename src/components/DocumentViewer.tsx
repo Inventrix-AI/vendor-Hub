@@ -13,6 +13,7 @@ interface Document {
   document_type: string
   created_at: string
   uploaded_at?: string
+  storage_url?: string // Supabase Storage URL
 }
 
 interface DocumentViewerProps {
