@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { paymentApi } from '@/lib/api'
 import { toast } from 'react-toastify'
-import { X, CreditCard } from 'lucide-react'
+import { X, CreditCard, Wifi, WifiOff } from 'lucide-react'
 
 interface PaymentModalProps {
   isOpen: boolean
@@ -26,20 +26,72 @@ export function PaymentModal({
   amount,
   onPaymentSuccess
 }: PaymentModalProps) {
+  const [isOnline, setIsOnline] = useState(true)
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false)
+
+  // Monitor network connectivity
   useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    // Check initial state
+    setIsOnline(navigator.onLine)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  useEffect(() => {
+    // Check if Razorpay script is already loaded
+    if (window.Razorpay) {
+      return
+    }
+
+    // Check if script is already being loaded
+    const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')
+    if (existingScript) {
+      return
+    }
+
     // Load Razorpay script
     const script = document.createElement('script')
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.async = true
+    
+    script.onload = () => {
+      console.log('Razorpay script loaded successfully')
+      setRazorpayLoaded(true)
+    }
+    
+    script.onerror = () => {
+      console.error('Failed to load Razorpay script')
+      setRazorpayLoaded(false)
+      toast.error('Failed to load payment system. Please check your internet connection and try again.')
+    }
+    
     document.body.appendChild(script)
 
     return () => {
-      document.body.removeChild(script)
+      // Only remove if script exists and was added by this component
+      if (document.body.contains(script)) {
+        document.body.removeChild(script)
+      }
     }
   }, [])
 
   const handlePayment = async () => {
     try {
+      // Check if Razorpay is loaded
+      if (!window.Razorpay) {
+        toast.error('Payment system not loaded. Please wait and try again.')
+        return
+      }
+
       // Create order via our API
       const orderResponse = await fetch('/api/payment/create-order', {
         method: 'POST',
@@ -52,10 +104,17 @@ export function PaymentModal({
       })
 
       const orderData = await orderResponse.json()
-      if (!orderResponse.ok) throw new Error(orderData.error)
+      if (!orderResponse.ok) throw new Error(orderData.error || 'Failed to create order')
+
+      // Use the key from the server response (more secure) or fallback to env variable
+      const razorpayKey = orderData.key || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
+      
+      if (!razorpayKey) {
+        throw new Error('Razorpay key not configured')
+      }
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_1234567890',
+        key: razorpayKey,
         amount: orderData.amount,
         currency: orderData.currency,
         name: 'Vendor Onboarding System',
@@ -71,7 +130,7 @@ export function PaymentModal({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                applicationId
+                application_id: applicationId
               })
             })
 
@@ -81,15 +140,16 @@ export function PaymentModal({
               onPaymentSuccess()
               onClose()
             } else {
-              throw new Error(verifyData.error)
+              throw new Error(verifyData.error || 'Payment verification failed')
             }
           } catch (error) {
-            toast.error('Payment verification failed')
+            console.error('Payment verification error:', error)
+            toast.error(`Payment verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
           }
         },
         modal: {
           ondismiss: () => {
-            console.log('Payment modal dismissed')
+            console.log('Payment modal dismissed by user')
           }
         },
         prefill: {
@@ -100,10 +160,12 @@ export function PaymentModal({
         }
       }
 
+      console.log('Opening Razorpay with options:', { ...options, key: razorpayKey.substring(0, 10) + '...' })
       const razorpay = new window.Razorpay(options)
       razorpay.open()
     } catch (error) {
-      toast.error('Failed to initiate payment')
+      console.error('Payment initiation error:', error)
+      toast.error(`Failed to initiate payment: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -150,12 +212,52 @@ export function PaymentModal({
             </div>
           </div>
 
+          {!isOnline && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center space-x-3">
+                <WifiOff className="h-5 w-5 text-red-500" />
+                <div>
+                  <h4 className="text-sm font-medium text-red-800">No Internet Connection</h4>
+                  <p className="text-sm text-red-700">
+                    Please check your internet connection and try again.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isOnline && !razorpayLoaded && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+                <div>
+                  <h4 className="text-sm font-medium text-yellow-800">Loading Payment System</h4>
+                  <p className="text-sm text-yellow-700">
+                    Please wait while we load the secure payment system...
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handlePayment}
-            className="w-full btn-primary flex items-center justify-center space-x-2 py-3"
+            disabled={!isOnline || !razorpayLoaded}
+            className={`w-full flex items-center justify-center space-x-2 py-3 ${
+              isOnline && (razorpayLoaded || window.Razorpay) 
+                ? 'btn-primary' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
             <CreditCard className="h-4 w-4" />
-            <span>Pay ₹{amount}</span>
+            <span>
+              {!isOnline 
+                ? 'No Internet Connection' 
+                : !razorpayLoaded && !window.Razorpay
+                ? 'Loading Payment System...'
+                : `Pay ₹${amount}`
+              }
+            </span>
           </button>
 
           <p className="text-xs text-gray-500 text-center">

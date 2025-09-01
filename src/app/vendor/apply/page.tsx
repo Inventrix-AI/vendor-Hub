@@ -8,52 +8,29 @@ import * as yup from 'yup'
 import { toast } from 'react-toastify'
 import { Layout } from '@/components/Layout'
 import { vendorApi } from '@/lib/api'
-import { Building2, MapPin, CreditCard, Send } from 'lucide-react'
+import { Building2, MapPin, Send } from 'lucide-react'
 import { VendorApplicationCreate } from '@/types'
 
 const schema = yup.object({
-  business_name: yup.string().required('Business name is required'),
+  business_name: yup.string().required('Shop name is required'),
   business_type: yup.string().required('Business type is required'),
-  registration_number: yup.string(),
-  tax_id: yup.string(),
   address: yup.string().required('Address is required'),
   city: yup.string().required('City is required'),
   state: yup.string().required('State is required'),
   postal_code: yup.string().required('Postal code is required'),
-  country: yup.string().required('Country is required'),
-  bank_name: yup.string(),
-  account_number: yup.string(),
-  routing_number: yup.string(),
 })
 
 const businessTypes = [
-  'Sole Proprietorship',
-  'Partnership',
-  'Private Limited Company',
-  'Public Limited Company',
-  'Limited Liability Partnership',
-  'One Person Company',
+  'Street Food Vendor',
+  'Fruit & Vegetable Seller', 
+  'Clothing & Accessories',
+  'Electronics & Mobile Accessories',
+  'Household Items',
+  'Handicrafts & Art',
+  'Books & Stationery',
   'Other'
 ]
 
-const countries = [
-  'India',
-  'United States',
-  'United Kingdom',
-  'Canada',
-  'Australia',
-  'Singapore',
-  'Other'
-]
-
-const indianStates = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
-  'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim',
-  'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
-  'West Bengal', 'Delhi', 'Chandigarh', 'Puducherry'
-]
 
 export default function VendorApplicationPage() {
   const [loading, setLoading] = useState(false)
@@ -62,25 +39,33 @@ export default function VendorApplicationPage() {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<VendorApplicationCreate>({
     resolver: yupResolver(schema) as any,
     defaultValues: {
-      country: 'India'
+      state: 'Madhya Pradesh'
     }
   })
-
-  const selectedCountry = watch('country')
 
   const onSubmit = async (data: VendorApplicationCreate) => {
     try {
       setLoading(true)
-      const application = await vendorApi.createApplication(data)
+      // Add default values for the simplified form
+      const applicationData = {
+        ...data,
+        company_name: data.business_name,
+        phone: '', // Will be added later
+        contact_email: '', // Will be generated or added later
+        business_description: '',
+        country: 'India'
+      }
+      
+      const application = await vendorApi.createApplication(applicationData)
       toast.success('Application submitted successfully!')
       router.push(`/vendor/application/${application.application_id}`)
     } catch (error) {
       console.error('Failed to submit application:', error)
+      toast.error('Failed to submit application. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -101,14 +86,14 @@ export default function VendorApplicationPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label htmlFor="business_name" className="block text-sm font-medium text-gray-700">
-                    Business Name *
+                    Shop Name *
                   </label>
                   <input
                     {...register('business_name')}
                     type="text"
                     id="business_name"
                     className="input-field mt-1"
-                    placeholder="Enter your business name"
+                    placeholder="Enter your shop/business name"
                   />
                   {errors.business_name && (
                     <p className="mt-1 text-sm text-red-600">{errors.business_name.message}</p>
@@ -132,32 +117,6 @@ export default function VendorApplicationPage() {
                   {errors.business_type && (
                     <p className="mt-1 text-sm text-red-600">{errors.business_type.message}</p>
                   )}
-                </div>
-
-                <div>
-                  <label htmlFor="registration_number" className="block text-sm font-medium text-gray-700">
-                    Registration Number
-                  </label>
-                  <input
-                    {...register('registration_number')}
-                    type="text"
-                    id="registration_number"
-                    className="input-field mt-1"
-                    placeholder="Business registration number"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label htmlFor="tax_id" className="block text-sm font-medium text-gray-700">
-                    Tax ID / GST Number
-                  </label>
-                  <input
-                    {...register('tax_id')}
-                    type="text"
-                    id="tax_id"
-                    className="input-field mt-1"
-                    placeholder="Tax identification number"
-                  />
                 </div>
               </div>
             </div>
@@ -204,28 +163,16 @@ export default function VendorApplicationPage() {
 
                 <div>
                   <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-                    State/Province *
+                    State *
                   </label>
-                  {selectedCountry === 'India' ? (
-                    <select
-                      {...register('state')}
-                      id="state"
-                      className="input-field mt-1"
-                    >
-                      <option value="">Select state</option>
-                      {indianStates.map((state) => (
-                        <option key={state} value={state}>{state}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      {...register('state')}
-                      type="text"
-                      id="state"
-                      className="input-field mt-1"
-                      placeholder="State/Province"
-                    />
-                  )}
+                  <input
+                    {...register('state')}
+                    type="text"
+                    id="state"
+                    value="Madhya Pradesh"
+                    className="input-field mt-1 bg-gray-50"
+                    readOnly
+                  />
                   {errors.state && (
                     <p className="mt-1 text-sm text-red-600">{errors.state.message}</p>
                   )}
@@ -240,81 +187,16 @@ export default function VendorApplicationPage() {
                     type="text"
                     id="postal_code"
                     className="input-field mt-1"
-                    placeholder="Postal code"
+                    placeholder="Enter 6-digit pincode"
+                    maxLength={6}
                   />
                   {errors.postal_code && (
                     <p className="mt-1 text-sm text-red-600">{errors.postal_code.message}</p>
                   )}
                 </div>
-
-                <div>
-                  <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                    Country *
-                  </label>
-                  <select
-                    {...register('country')}
-                    id="country"
-                    className="input-field mt-1"
-                  >
-                    {countries.map((country) => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                  {errors.country && (
-                    <p className="mt-1 text-sm text-red-600">{errors.country.message}</p>
-                  )}
-                </div>
               </div>
             </div>
 
-            {/* Banking Information */}
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <CreditCard className="h-5 w-5 text-primary-600" />
-                <h3 className="text-lg font-medium text-gray-900">Banking Information (Optional)</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label htmlFor="bank_name" className="block text-sm font-medium text-gray-700">
-                    Bank Name
-                  </label>
-                  <input
-                    {...register('bank_name')}
-                    type="text"
-                    id="bank_name"
-                    className="input-field mt-1"
-                    placeholder="Bank name"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="account_number" className="block text-sm font-medium text-gray-700">
-                    Account Number
-                  </label>
-                  <input
-                    {...register('account_number')}
-                    type="text"
-                    id="account_number"
-                    className="input-field mt-1"
-                    placeholder="Bank account number"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="routing_number" className="block text-sm font-medium text-gray-700">
-                    IFSC Code / Routing Number
-                  </label>
-                  <input
-                    {...register('routing_number')}
-                    type="text"
-                    id="routing_number"
-                    className="input-field mt-1"
-                    placeholder="IFSC code or routing number"
-                  />
-                </div>
-              </div>
-            </div>
 
             {/* Submit Button */}
             <div className="flex justify-end space-x-4">

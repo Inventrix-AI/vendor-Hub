@@ -48,12 +48,27 @@ api.interceptors.response.use(
 // Auth API calls
 export const authApi = {
   login: async (credentials: { username: string; password: string }) => {
-    const response = await api.post('/api/auth', {
-      action: 'login',
-      username: credentials.username,
-      password: credentials.password
+    // Use fetch instead of axios to avoid circular dependencies with interceptors
+    const response = await fetch('/api/auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'login',
+        username: credentials.username,
+        email: credentials.username, // API expects email field
+        password: credentials.password
+      })
     })
-    return response.data
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Login failed')
+    }
+    
+    return data
   },
   
   register: async (data: {
@@ -153,40 +168,8 @@ export const adminApi = {
   },
   
   getApplicationDetail: async (applicationId: string) => {
-    // For now, return mock data - in production, implement proper endpoint
-    return {
-      id: applicationId,
-      application_id: applicationId,
-      business_name: 'Sample Company',
-      company_name: 'Sample Company',
-      contact_email: 'contact@sample.com',
-      phone: '+1234567890',
-      business_type: 'Technology',
-      status: 'pending',
-      documents: [],
-      submitted_at: new Date().toISOString(),
-      business_description: 'Sample business description',
-      vendor_id: null,
-      payment_status: 'pending',
-      rejection_reason: null,
-      reviewed_at: null,
-      user_email: 'contact@sample.com',
-      user_phone: '+1234567890',
-      user_full_name: 'Sample User',
-      registration_number: 'REG123456789',
-      business_address: '123 Business Street, City, State 12345',
-      tax_id: 'TAX123456789',
-      address: '123 Business Street',
-      city: 'Sample City',
-      state: 'Sample State',
-      zip_code: '12345',
-      postal_code: '12345',
-      country: 'India',
-      bank_name: 'Sample Bank',
-      account_number: '1234567890',
-      ifsc_code: 'SAMP0001234',
-      routing_number: '123456789'
-    }
+    const response = await api.get(`/api/admin?type=application&id=${applicationId}`)
+    return response.data
   },
   
   getDashboardStats: async () => {

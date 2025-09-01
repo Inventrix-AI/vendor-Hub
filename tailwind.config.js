@@ -21,6 +21,17 @@ module.exports = {
           800: '#1e40af',
           900: '#1e3a8a',
         },
+        gov: {
+          coral: '#FF6B6B',
+          white: '#ffffff',
+          teal: '#20B2AA',
+          blue: '#000080',
+        },
+      },
+      fontFamily: {
+        'sans': ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        'devanagari': ['var(--font-devanagari)', 'system-ui', 'sans-serif'],
+        'mixed': ['var(--font-devanagari)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
       },
     },
   },

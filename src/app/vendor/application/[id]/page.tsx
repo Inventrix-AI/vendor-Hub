@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { Layout } from '@/components/Layout'
 import { DocumentUpload } from '@/components/DocumentUpload'
 import { PaymentModal } from '@/components/PaymentModal'
+import { DocumentViewer } from '@/components/DocumentViewer'
 import { vendorApi } from '@/lib/api'
 import { 
   FileText,
@@ -24,6 +25,7 @@ export default function ApplicationDetailPage() {
   const params = useParams()
   const applicationId = params.id as string
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false)
 
   const { data: application, isLoading, refetch } = useQuery<VendorApplication>(
     ['vendor-application', applicationId],
@@ -263,6 +265,54 @@ export default function ApplicationDetailPage() {
           </div>
         )}
 
+        {/* Documents Viewing Section */}
+        {application.documents && application.documents.length > 0 && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-5 w-5 text-primary-600" />
+                <h3 className="text-lg font-medium text-gray-900">Uploaded Documents</h3>
+              </div>
+              <button
+                onClick={() => setDocumentViewerOpen(true)}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <Eye className="h-4 w-4" />
+                <span>View All ({application.documents.length})</span>
+              </button>
+            </div>
+            
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {application.documents.slice(0, 3).map((doc: any) => (
+                <div key={doc.id} className="p-3 border border-gray-200 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="h-8 w-8 text-blue-500" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-medium text-gray-900 truncate">
+                        {doc.document_type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      </h4>
+                      <p className="text-xs text-gray-500 truncate">{doc.file_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(doc.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {application.documents.length > 3 && (
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex items-center justify-center">
+                  <div className="text-center">
+                    <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">
+                      +{application.documents.length - 3} more documents
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Payment Section */}
         {application.status === 'payment_pending' && (
           <div className="card">
@@ -307,6 +357,15 @@ export default function ApplicationDetailPage() {
           setPaymentModalOpen(false)
         }}
       />
+
+      {/* Document Viewer Modal */}
+      {application.documents && (
+        <DocumentViewer
+          documents={application.documents}
+          isOpen={documentViewerOpen}
+          onClose={() => setDocumentViewerOpen(false)}
+        />
+      )}
     </Layout>
   )
 }

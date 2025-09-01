@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useParams } from 'next/navigation'
 import { toast } from 'react-toastify'
 import { Layout } from '@/components/Layout'
+import { DocumentViewer } from '@/components/DocumentViewer'
 import { adminApi } from '@/lib/api'
 import { 
   FileText,
@@ -27,6 +28,7 @@ export default function ApplicationReviewPage() {
   const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected' | ''>('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [showReviewForm, setShowReviewForm] = useState(false)
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false)
 
   const { data: application, isLoading } = useQuery(
     ['admin-application-detail', applicationId],
@@ -375,7 +377,18 @@ export default function ApplicationReviewPage() {
           <div className="space-y-6">
             {/* Documents */}
             <div className="card">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Uploaded Documents</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Uploaded Documents</h3>
+                {application.documents && application.documents.length > 0 && (
+                  <button
+                    onClick={() => setDocumentViewerOpen(true)}
+                    className="btn-secondary flex items-center space-x-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>View All ({application.documents.length})</span>
+                  </button>
+                )}
+              </div>
               
               {!application.documents || application.documents.length === 0 ? (
                 <p className="text-sm text-gray-500">No documents uploaded yet</p>
@@ -389,16 +402,25 @@ export default function ApplicationReviewPage() {
                           <p className="text-sm font-medium text-gray-900">
                             {doc.document_type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                           </p>
-                          <p className="text-xs text-gray-500">{doc.filename}</p>
+                          <p className="text-xs text-gray-500">{doc.file_name}</p>
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <button className="text-primary-600 hover:text-primary-700">
+                        <button 
+                          onClick={() => setDocumentViewerOpen(true)}
+                          className="text-primary-600 hover:text-primary-700"
+                          title="View Document"
+                        >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button className="text-gray-400 hover:text-gray-600">
+                        <a
+                          href={`/api/documents/${doc.id}`}
+                          download={doc.file_name}
+                          className="text-gray-400 hover:text-gray-600"
+                          title="Download Document"
+                        >
                           <Download className="h-4 w-4" />
-                        </button>
+                        </a>
                       </div>
                     </div>
                   ))}
@@ -434,6 +456,15 @@ export default function ApplicationReviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Document Viewer Modal */}
+      {application?.documents && (
+        <DocumentViewer
+          documents={application.documents}
+          isOpen={documentViewerOpen}
+          onClose={() => setDocumentViewerOpen(false)}
+        />
+      )}
     </Layout>
   )
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { VendorApplicationDB } from '@/lib/database';
+import { VendorApplicationDB, DocumentDB } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -17,6 +17,29 @@ export async function GET(request: NextRequest) {
     
     const applications = VendorApplicationDB.findAll(filters);
     return NextResponse.json(applications);
+  }
+
+  if (type === 'application') {
+    const applicationId = searchParams.get('id');
+    if (!applicationId) {
+      return NextResponse.json({ error: 'Application ID required' }, { status: 400 });
+    }
+    
+    const application = VendorApplicationDB.findByApplicationId(applicationId);
+    if (!application) {
+      return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+    }
+    
+    // Get documents for this application
+    const documents = DocumentDB.findByApplicationId(application.id);
+    
+    // Return application with documents
+    const applicationWithDocs = {
+      ...application,
+      documents
+    };
+    
+    return NextResponse.json(applicationWithDocs);
   }
 
   // Default: dashboard stats

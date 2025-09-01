@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { useLanguage } from '@/lib/language'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { LogOut, User, Building2, Settings, ChevronDown } from 'lucide-react'
 
 interface LayoutProps {
@@ -12,6 +14,7 @@ interface LayoutProps {
 
 export function Layout({ children, title }: LayoutProps) {
   const { user, logout } = useAuth()
+  const { language } = useLanguage()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -35,54 +38,67 @@ export function Layout({ children, title }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-white">
-      <nav className="bg-white/95 backdrop-blur-md border-b border-neutral-200/60 sticky top-0 z-50">
+    <div className={`min-h-screen bg-gradient-to-br from-neutral-50 to-white ${language === 'hi' ? 'font-mixed' : 'font-sans'}`}>
+      {/* Government Header Strip */}
+      <div className="gov-header"></div>
+      
+      {/* Government Style Navigation */}
+      <nav className="bg-white shadow-md border-b border-neutral-200 sticky top-0 z-50">
         <div className="container-fluid">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="flex items-center space-x-2 group">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <Building2 className="h-5 w-5 text-white" />
+          <div className="flex items-center justify-between h-16 px-4 sm:px-6">
+            <div className="flex items-center space-x-3">
+              <Link href="/" className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gov-blue rounded-full flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-xl font-bold text-neutral-900">vendorHub</span>
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-gov-blue leading-tight">
+                    {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
+                  </span>
+                  <span className="text-xs text-neutral-600">
+                    {language === 'hi' ? 'मध्यप्रदेश' : 'Madhya Pradesh'}
+                  </span>
+                </div>
               </Link>
             </div>
 
-            {user ? (
-              <div className="flex items-center space-x-6">
-                <span className="text-sm text-neutral-600 hidden md:block">
-                  Welcome, <span className="font-medium text-neutral-900">{user.full_name}</span>
-                </span>
+            <div className="flex items-center space-x-2">
+              <LanguageSwitcher />
+              {user ? (
+                <div className="flex items-center space-x-4 ml-4">
+                  <span className="text-sm text-neutral-600 hidden md:block">
+                    Welcome, <span className="font-medium text-neutral-900">{user.full_name}</span>
+                  </span>
                 
-                {user.role === 'vendor' && (
-                  <Link
-                    href="/vendor/dashboard"
-                    className="text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-100"
-                  >
-                    Dashboard
-                  </Link>
-                )}
-                
-                {(user.role === 'admin' || user.role === 'super_admin' || user.role === 'reviewer') && (
-                  <Link
-                    href="/admin/dashboard"
-                    className="text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-100"
-                  >
-                    Admin
-                  </Link>
-                )}
+                  {user.role === 'vendor' && (
+                    <Link
+                      href="/vendor/dashboard"
+                      className="text-neutral-600 hover:text-gov-blue px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-blue-50"
+                    >
+                      Dashboard
+                    </Link>
+                  )}
+                  
+                  {(user.role === 'admin' || user.role === 'super_admin' || user.role === 'reviewer') && (
+                    <Link
+                      href="/admin/dashboard"
+                      className="text-neutral-600 hover:text-gov-blue px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-blue-50"
+                    >
+                      Admin
+                    </Link>
+                  )}
 
-                <div className="relative" ref={dropdownRef}>
-                  <button 
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-2 text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-neutral-100 cursor-pointer"
-                  >
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="hidden md:block">Account</span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
+                  <div className="relative" ref={dropdownRef}>
+                    <button 
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      className="flex items-center space-x-2 text-neutral-600 hover:text-gov-blue px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-blue-50 cursor-pointer"
+                    >
+                      <div className="w-8 h-8 bg-gov-blue rounded-full flex items-center justify-center">
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                      <span className="hidden md:block">Account</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
                   
                   {dropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-neutral-200/60 py-2 z-50 animate-fade-in-up">
@@ -109,18 +125,19 @@ export function Layout({ children, title }: LayoutProps) {
                       </button>
                     </div>
                   )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-3">
-                <Link href="/auth/login" className="btn btn-ghost btn-sm">
-                  Sign In
-                </Link>
-                <Link href="/auth/register" className="btn btn-primary btn-sm">
-                  Get Started
-                </Link>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center space-x-3 ml-4">
+                  <Link href="/auth/login" className="text-neutral-600 hover:text-gov-blue transition-colors text-sm font-medium">
+                    Sign In
+                  </Link>
+                  <Link href="/vendor/register" className="bg-gov-coral hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Get Started
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { PaymentDB, VendorApplicationDB, VendorSubscriptionDB, AuditLogDB } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,7 +8,7 @@ export async function POST(request: NextRequest) {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      applicationId
+      application_id
     } = await request.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -18,7 +19,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Razorpay secret key
-    const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || 'test_secret_key_1234567890';
+    const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpayKeySecret) {
+      return NextResponse.json(
+        { error: 'Razorpay configuration missing' },
+        { status: 500 }
+      );
+    }
 
     // Create signature for verification
     const body = razorpay_order_id + '|' + razorpay_payment_id;
@@ -37,30 +45,77 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Payment is verified - update application status
-    const paymentRecord = {
-      id: crypto.randomUUID(),
-      applicationId,
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      status: 'completed',
-      amount: 500, // Should get from order
-      currency: 'INR',
-      verifiedAt: new Date().toISOString(),
-      signature: razorpay_signature
-    };
+    // Find the application
+    const application = application_id 
+      ? await VendorApplicationDB.findByApplicationId(application_id)
+      : null;
 
-    // Store payment record (mock implementation)
-    console.log('Payment verified and stored:', paymentRecord);
+    if (!application) {
+      return NextResponse.json(
+        { error: 'Application not found' },
+        { status: 404 }
+      );
+    }
 
-    // Update application status to "payment_completed"
-    // This would typically update the database
-    console.log(`Application ${applicationId} payment completed`);
+    // Update payment record
+    await PaymentDB.updateByOrderId(razorpay_order_id, {
+      razorpay_payment_id: razorpay_payment_id,
+      status: 'success',
+      payment_reference: razorpay_signature
+    });
+
+    // Update application status to payment completed
+    await VendorApplicationDB.updateById(application.id, {
+      payment_status: 'paid',
+      status: 'under_review'
+    });
+
+    // Create vendor subscription
+    const currentDate = new Date();
+    const expiryDate = new Date();
+    expiryDate.setFullYear(currentDate.getFullYear() + 1); // 1 year subscription
+
+    // Generate vendor_id if it doesn't exist
+    const vendorId = application.vendor_id || `VEN_${Date.now().toString().slice(-6)}`;
+    
+    // Update application with vendor_id if it was generated
+    if (!application.vendor_id) {
+      await VendorApplicationDB.updateById(application.id, {
+        vendor_id: vendorId
+      });
+    }
+
+    await VendorSubscriptionDB.create({
+      vendor_id: vendorId,
+      application_id: application.id,
+      subscription_status: 'active',
+      activated_at: currentDate,
+      expires_at: expiryDate
+    });
+
+    // Log the payment verification
+    await AuditLogDB.create({
+      application_id: application.id,
+      user_id: application.user_id,
+      action: 'Payment Verified',
+      entity_type: 'payment',
+      entity_id: application.id,
+      new_values: {
+        razorpay_order_id,
+        razorpay_payment_id,
+        payment_status: 'success',
+        verified_at: new Date().toISOString()
+      }
+    });
+
+    console.log(`Payment verified for application ${application_id}`);
 
     return NextResponse.json({
       success: true,
       message: 'Payment verified successfully',
-      paymentId: razorpay_payment_id
+      paymentId: razorpay_payment_id,
+      applicationId: application_id,
+      status: 'under_review'
     });
 
   } catch (error) {

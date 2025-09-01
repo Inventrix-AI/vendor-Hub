@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'login') {
-      const loginEmail = username || email;
-      if (!loginEmail || !password) {
+      const loginIdentifier = username || email;
+      if (!loginIdentifier || !password) {
         return NextResponse.json(
           { error: 'Missing credentials' },
           { status: 400 }
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         
         if (isVercelEnvironment) {
           // Use hardcoded users for Vercel deployment
-          const user = DEMO_USERS.find(u => u.email === loginEmail);
+          const user = DEMO_USERS.find(u => u.email === loginIdentifier);
           
           if (!user || !await bcrypt.compare(password, user.password_hash)) {
             return NextResponse.json(
@@ -105,8 +105,43 @@ export async function POST(request: NextRequest) {
 
           result = { user, token };
         } else {
-          // Use AuthService for local development
-          result = await AuthService.login(loginEmail, password);
+          // Use database for local development - support both email and vendor ID login
+          const { UserDB, VendorApplicationDB } = await import('@/lib/database');
+          
+          let user = null;
+          
+          // First try to find by email
+          if (loginIdentifier.includes('@')) {
+            user = UserDB.findByEmail(loginIdentifier);
+          } else {
+            // Try to find by vendor ID or application ID
+            if (loginIdentifier.startsWith('PVS') || loginIdentifier.startsWith('APP')) {
+              const application = VendorApplicationDB.findByApplicationId(loginIdentifier);
+              if (application) {
+                user = UserDB.findById(application.user_id);
+              }
+            }
+          }
+          
+          if (!user || !await bcrypt.compare(password, user.password_hash)) {
+            return NextResponse.json(
+              { error: 'Invalid credentials' },
+              { status: 401 }
+            );
+          }
+
+          // Generate JWT token
+          const token = jwt.sign(
+            { 
+              userId: user.id, 
+              email: user.email, 
+              role: user.role 
+            },
+            process.env.JWT_SECRET || 'fallback-secret-key',
+            { expiresIn: '24h' }
+          );
+
+          result = { user, token };
         }
         
         if (!result) {
@@ -119,6 +154,7 @@ export async function POST(request: NextRequest) {
         const { user, token } = result;
 
         return NextResponse.json({
+          success: true,
           user: {
             id: user.id,
             email: user.email,

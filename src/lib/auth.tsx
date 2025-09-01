@@ -27,12 +27,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = () => {
-      const token = Cookies.get('access_token')
+      // Check both cookies and localStorage for token (for backward compatibility)
+      const cookieToken = Cookies.get('access_token')
+      const localStorageToken = localStorage.getItem('auth_token')
+      const token = cookieToken || localStorageToken
+      
       const userData = localStorage.getItem('user')
       
       if (token && userData) {
         try {
-          setUser(JSON.parse(userData))
+          const parsedUser = JSON.parse(userData)
+          setUser(parsedUser)
+          
+          // If we found token in localStorage but not in cookies, migrate it
+          if (localStorageToken && !cookieToken) {
+            Cookies.set('access_token', localStorageToken, { expires: 1 })
+            localStorage.removeItem('auth_token') // Clean up old storage
+          }
         } catch (error) {
           console.error('Failed to parse user data:', error)
           logout()
@@ -119,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     Cookies.remove('access_token')
+    localStorage.removeItem('auth_token') // Remove legacy token storage
     localStorage.removeItem('user')
     setUser(null)
     window.location.href = '/auth/login'

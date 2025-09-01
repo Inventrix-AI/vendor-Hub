@@ -7,7 +7,7 @@ let pool: Pool | null = null;
 export function getDatabase(): Pool {
   if (!pool) {
     const databaseUrl = process.env.DATABASE_URL;
-    
+
     if (!databaseUrl) {
       throw new Error('DATABASE_URL environment variable is required');
     }
@@ -23,34 +23,67 @@ export function getDatabase(): Pool {
     // Initialize schema if needed
     initializeSchema();
   }
-  
+
   return pool;
 }
 
 async function initializeSchema() {
   if (!pool) return;
-  
+
   try {
     // Check if tables exist
     const tableCheck = await pool.query(`
       SELECT table_name FROM information_schema.tables 
       WHERE table_schema = 'public' AND table_name = 'users'
     `);
-    
+
     if (tableCheck.rows.length === 0) {
       console.log('Initializing database schema...');
-      
+
       // Read and execute schema
       const schemaPath = join(process.cwd(), 'database', 'schema.sql');
       const schema = readFileSync(schemaPath, 'utf-8');
-      
+
       // Execute the entire schema
       await pool.query(schema);
-      
+
       console.log('Database schema initialized successfully');
+    } else {
+      // Run migrations for existing databases
+      await runMigrations();
     }
   } catch (error) {
     console.error('Error initializing schema:', error);
+  }
+}
+
+async function runMigrations() {
+  if (!pool) return;
+
+  try {
+    // Check if phone column has unique constraint
+    const constraintCheck = await pool.query(`
+      SELECT constraint_name 
+      FROM information_schema.table_constraints 
+      WHERE table_name = 'users' 
+      AND constraint_type = 'UNIQUE' 
+      AND constraint_name = 'users_phone_unique'
+    `);
+
+    if (constraintCheck.rows.length === 0) {
+      console.log('Running migration: Adding unique constraints for mobile and email...');
+
+      // Read and execute migration
+      const migrationPath = join(process.cwd(), 'database', 'migrations', 'add_unique_constraints.sql');
+      const migration = readFileSync(migrationPath, 'utf-8');
+
+      // Execute the migration
+      await pool.query(migration);
+
+      console.log('Migration completed successfully');
+    }
+  } catch (error) {
+    console.error('Error running migrations:', error);
   }
 }
 
@@ -82,12 +115,12 @@ export const UserDB = {
     `, [user.email, user.password_hash, user.full_name, user.phone || null, user.role || 'vendor']);
     return result.rows[0];
   },
-  
+
   findByEmail: async (email: string) => {
     const result = await executeQuery('SELECT * FROM users WHERE email = $1', [email]);
     return result.rows[0] || null;
   },
-  
+
   findById: async (id: number) => {
     const result = await executeQuery('SELECT * FROM users WHERE id = $1', [id]);
     return result.rows[0] || null;
@@ -99,15 +132,16 @@ export const VendorApplicationDB = {
   create: async (application: any) => {
     const result = await executeQuery(`
       INSERT INTO vendor_applications (
-        application_id, user_id, company_name, business_name, contact_email, phone,
+        application_id, user_id, vendor_id, company_name, business_name, contact_email, phone,
         business_type, business_description, registration_number, tax_id,
         address, city, state, postal_code, country, bank_name, account_number,
         ifsc_code, routing_number, status, payment_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING *
     `, [
       application.application_id,
       application.user_id,
+      application.vendor_id,
       application.company_name,
       application.business_name || application.company_name,
       application.contact_email,
@@ -130,7 +164,7 @@ export const VendorApplicationDB = {
     ]);
     return result.rows[0];
   },
-  
+
   findByApplicationId: async (applicationId: string) => {
     const result = await executeQuery(`
       SELECT va.*, u.email as user_email, u.full_name as user_full_name, u.phone as user_phone
@@ -140,7 +174,7 @@ export const VendorApplicationDB = {
     `, [applicationId]);
     return result.rows[0] || null;
   },
-  
+
   findByUserId: async (userId: number) => {
     const result = await executeQuery(
       'SELECT * FROM vendor_applications WHERE user_id = $1 ORDER BY created_at DESC',
@@ -148,7 +182,7 @@ export const VendorApplicationDB = {
     );
     return result.rows;
   },
-  
+
   findAll: async (filters: { status?: string; search?: string; limit?: number } = {}) => {
     let query = `
       SELECT va.*, u.email as user_email, u.full_name as user_full_name
@@ -158,38 +192,38 @@ export const VendorApplicationDB = {
     `;
     const params: any[] = [];
     let paramCount = 0;
-    
+
     if (filters.status) {
       paramCount++;
       query += ` AND va.status = $${paramCount}`;
       params.push(filters.status);
     }
-    
+
     if (filters.search) {
       paramCount++;
       query += ` AND (va.company_name ILIKE $${paramCount} OR va.contact_email ILIKE $${paramCount + 1})`;
       params.push(`%${filters.search}%`, `%${filters.search}%`);
       paramCount++;
     }
-    
+
     query += ' ORDER BY va.created_at DESC';
-    
+
     if (filters.limit) {
       paramCount++;
       query += ` LIMIT $${paramCount}`;
       params.push(filters.limit);
     }
-    
+
     const result = await executeQuery(query, params);
     return result.rows;
   },
-  
+
   update: async (applicationId: string, updates: any) => {
     const fields = Object.keys(updates);
     const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
     const values = Object.values(updates);
     values.push(applicationId);
-    
+
     const result = await executeQuery(`
       UPDATE vendor_applications 
       SET ${setClause}, updated_at = CURRENT_TIMESTAMP 
@@ -198,18 +232,33 @@ export const VendorApplicationDB = {
     `, values);
     return result.rows[0];
   },
-  
+
+  updateById: async (id: number, updates: any) => {
+    const fields = Object.keys(updates);
+    const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+    const values = Object.values(updates);
+    values.push(id);
+
+    const result = await executeQuery(`
+      UPDATE vendor_applications 
+      SET ${setClause}, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $${values.length}
+      RETURNING *
+    `, values);
+    return result.rows[0];
+  },
+
   getStats: async () => {
     const totalResult = await executeQuery('SELECT COUNT(*) as count FROM vendor_applications');
     const statusResult = await executeQuery('SELECT status, COUNT(*) as count FROM vendor_applications GROUP BY status');
-    
+
     const stats = {
       total_applications: parseInt(totalResult.rows[0].count),
       pending_applications: 0,
       approved_applications: 0,
       rejected_applications: 0
     };
-    
+
     statusResult.rows.forEach((row: any) => {
       switch (row.status) {
         case 'pending':
@@ -223,7 +272,7 @@ export const VendorApplicationDB = {
           break;
       }
     });
-    
+
     return stats;
   }
 };
@@ -258,7 +307,7 @@ export const DocumentDB = {
     ]);
     return result.rows[0];
   },
-  
+
   findByApplicationId: async (applicationId: number) => {
     const result = await executeQuery(
       'SELECT * FROM documents WHERE application_id = $1 AND is_current = true ORDER BY created_at DESC',
@@ -276,21 +325,23 @@ export const PaymentDB = {
     amount: number;
     currency: string;
     payment_reference: string;
+    payment_type?: string;
   }) => {
     const result = await executeQuery(`
-      INSERT INTO payments (application_id, razorpay_order_id, amount, currency, payment_reference)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO payments (application_id, razorpay_order_id, amount, currency, payment_type, payment_reference)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `, [
       payment.application_id,
       payment.razorpay_order_id,
       payment.amount,
       payment.currency,
+      payment.payment_type || 'initial',
       payment.payment_reference
     ]);
     return result.rows[0];
   },
-  
+
   updateStatus: async (orderId: string, updates: { status: string; razorpay_payment_id?: string }) => {
     const result = await executeQuery(`
       UPDATE payments 
@@ -300,7 +351,22 @@ export const PaymentDB = {
     `, [updates.status, updates.razorpay_payment_id || null, orderId]);
     return result.rows[0];
   },
-  
+
+  updateByOrderId: async (orderId: string, updates: { razorpay_payment_id?: string; status?: string; payment_reference?: string; payment_type?: string }) => {
+    const fields = Object.keys(updates);
+    const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+    const values = Object.values(updates);
+    values.push(orderId);
+
+    const result = await executeQuery(`
+      UPDATE payments 
+      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+      WHERE razorpay_order_id = $${values.length}
+      RETURNING *
+    `, values);
+    return result.rows[0];
+  },
+
   findByApplicationId: async (applicationId: number) => {
     const result = await executeQuery(
       'SELECT * FROM payments WHERE application_id = $1 ORDER BY created_at DESC',
@@ -342,7 +408,7 @@ export const AuditLogDB = {
     ]);
     return result.rows[0];
   },
-  
+
   findByApplicationId: async (applicationId: number) => {
     const result = await executeQuery(`
       SELECT al.*, u.full_name as user_name
@@ -352,6 +418,49 @@ export const AuditLogDB = {
       ORDER BY al.created_at DESC
     `, [applicationId]);
     return result.rows;
+  }
+};
+
+// Vendor Subscription operations
+export const VendorSubscriptionDB = {
+  create: async (subscription: {
+    vendor_id: string;
+    application_id: number;
+    subscription_status?: string;
+    activated_at?: Date;
+    expires_at?: Date;
+  }) => {
+    const result = await executeQuery(`
+      INSERT INTO vendor_subscriptions (
+        vendor_id, application_id, subscription_status, activated_at, expires_at
+      ) VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [
+      subscription.vendor_id,
+      subscription.application_id,
+      subscription.subscription_status || 'active',
+      subscription.activated_at || new Date(),
+      subscription.expires_at || new Date()
+    ]);
+    return result.rows[0];
+  },
+
+  findByVendorId: async (vendorId: string) => {
+    const result = await executeQuery(
+      'SELECT * FROM vendor_subscriptions WHERE vendor_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [vendorId]
+    );
+    return result.rows[0] || null;
+  },
+
+  updateStatus: async (vendorId: string, status: string) => {
+    const result = await executeQuery(`
+      UPDATE vendor_subscriptions 
+      SET subscription_status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE vendor_id = $2
+      RETURNING *
+    `, [status, vendorId]);
+    return result.rows[0];
   }
 };
 

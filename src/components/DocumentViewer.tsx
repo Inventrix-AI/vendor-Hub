@@ -4,19 +4,15 @@ import React, { useState, useEffect } from 'react'
 import { X, ZoomIn, ZoomOut, Download, Eye, RotateCw, Maximize, Minimize, Grid, FileText } from 'lucide-react'
 
 interface Document {
-  id: string | number
-  documentReference?: string
-  originalName?: string
-  name?: string
-  fileName?: string
-  type?: string
-  fileType?: string
-  url?: string
-  filePath?: string
-  documentName?: string
-  documentDescription?: string
-  uploadedAt: string
-  fileSize?: number
+  id: number
+  document_reference: string
+  file_name: string
+  file_path: string
+  file_size: number
+  mime_type: string
+  document_type: string
+  created_at: string
+  uploaded_at?: string
 }
 
 interface DocumentViewerProps {
@@ -74,13 +70,13 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
 
   // Helper functions to get document properties
   const getDocumentName = (doc: Document) => 
-    doc.documentName || doc.name || doc.originalName || doc.fileName || 'Unknown Document'
+    doc.document_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
   
   const getDocumentUrl = (doc: Document) => 
-    doc.filePath || doc.url || ''
+    `/api/documents/${doc.id}`
   
   const getDocumentType = (doc: Document) => 
-    doc.fileType || doc.type || ''
+    doc.mime_type
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 300))
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 25))
@@ -113,17 +109,16 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
   const downloadDocument = (doc: Document) => {
     const link = document.createElement('a')
     link.href = getDocumentUrl(doc)
-    link.download = doc.originalName || doc.fileName || getDocumentName(doc)
+    link.download = doc.file_name
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return ''
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    if (bytes === 0) return '0 Byte'
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)).toString())
+    const i = Math.floor(Math.log(bytes) / Math.log(1024))
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
   }
 
@@ -172,9 +167,9 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
   const renderPDFViewer = (doc: Document, className = '') => (
     <div className={`${className}`}>
       <iframe
-        src={doc.url}
+        src={getDocumentUrl(doc)}
         className="w-full h-96 border border-gray-300 rounded-lg"
-        title={doc.name}
+        title={getDocumentName(doc)}
       />
       <div className="mt-4 flex justify-end">
         <button
@@ -305,10 +300,13 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {doc.name}
+                        {getDocumentName(doc)}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {doc.file_name}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {doc.type} • {new Date(doc.uploadedAt).toLocaleDateString()}
+                        {formatFileSize(doc.file_size)} • {new Date(doc.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -354,9 +352,9 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
                 {compareDocuments.map((doc, index) => (
                   <div key={doc.id} className="flex flex-col">
                     <h4 className="font-medium text-gray-900 mb-3">
-                      {doc.name}
+                      {getDocumentName(doc)}
                     </h4>
-                    {doc.type.startsWith('image/') 
+                    {getDocumentType(doc).startsWith('image/') 
                       ? renderImageViewer(doc, 'flex-1')
                       : renderPDFViewer(doc, 'flex-1')
                     }
@@ -366,9 +364,9 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
             ) : selectedDocument ? (
               <div>
                 <h4 className="font-medium text-gray-900 mb-4">
-                  {selectedDocument.name}
+                  {getDocumentName(selectedDocument)}
                 </h4>
-                {selectedDocument.type.startsWith('image/')
+                {getDocumentType(selectedDocument).startsWith('image/')
                   ? renderImageViewer(selectedDocument)
                   : renderPDFViewer(selectedDocument)
                 }

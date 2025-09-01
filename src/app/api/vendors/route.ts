@@ -1,117 +1,168 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IdGenerator } from '@/lib/vendorId';
-import { VendorApplicationDB, AuditLogDB } from '@/lib/database';
+import { VendorApplicationDB, AuditLogDB, UserDB, DocumentDB } from '@/lib/database';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const { company_name, contact_email, phone, business_type } = data;
+    const { company_name, business_type } = data;
 
-    // Validate required fields
-    if (!company_name || !contact_email || !phone || !business_type) {
+    // Validate required fields (simplified for street vendors)
+    if (!company_name || !business_type) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: shop name and business type' },
         { status: 400 }
       );
     }
 
-    // Generate unique application ID
+    // Generate unique IDs
     const applicationId = IdGenerator.applicationId();
+    const vendorId = `PVS${Date.now().toString().slice(-6)}`;
+    const temporaryPassword = Math.random().toString(36).slice(-8);
 
-    // For now, using a mock user ID (1) - in production, get from JWT token
-    const userId = 1;
+    // Create user account first
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
+
+    const user = await UserDB.create({
+      email: `${vendorId.toLowerCase()}@pathvikreta.org`, // Auto-generated email
+      password_hash: hashedPassword,
+      full_name: company_name, // Use shop name as full name initially
+      phone: data.phone || '', // Optional phone number
+      role: 'vendor'
+    });
 
     const applicationData = {
       application_id: applicationId,
-      user_id: userId,
+      user_id: user.id,
+      vendor_id: vendorId,
       company_name,
-      contact_email,
-      phone,
+      business_name: company_name,
+      contact_email: user.email,
+      phone: data.phone || '',
       business_type,
-      business_description: data.business_description || '',
-      registration_number: data.registration_number,
-      tax_id: data.tax_id,
-      address: data.address,
-      city: data.city,
-      state: data.state,
-      postal_code: data.postal_code,
-      country: data.country,
-      bank_name: data.bank_name,
-      account_number: data.account_number,
-      ifsc_code: data.ifsc_code,
-      routing_number: data.routing_number
+      business_description: '',
+      registration_number: null,
+      tax_id: null,
+      address: data.address || null,
+      city: data.city || null,
+      state: data.state || 'Madhya Pradesh',
+      postal_code: data.postal_code || null,
+      country: 'India',
+      bank_name: null,
+      account_number: null,
+      ifsc_code: null,
+      routing_number: null
     };
 
     // Save to database
-    const result = VendorApplicationDB.create(applicationData);
-    
+    const application = await VendorApplicationDB.create(applicationData);
+
     // Log the action
-    AuditLogDB.create({
-      application_id: result.lastInsertRowid as number,
-      user_id: userId,
-      action: 'Application Submitted',
+    await AuditLogDB.create({
+      application_id: application.id,
+      user_id: user.id,
+      action: 'Vendor Registration',
       entity_type: 'application',
-      entity_id: result.lastInsertRowid as number,
-      new_values: applicationData
+      entity_id: application.id,
+      new_values: {
+        ...applicationData,
+        vendor_id: vendorId,
+        temporary_password: temporaryPassword
+      }
     });
 
-    const application = {
-      id: applicationId,
-      ...applicationData,
+    const response = {
+      success: true,
+      application_id: applicationId,
+      vendor_id: vendorId,
+      email: user.email,
+      temporary_password: temporaryPassword,
       status: 'pending',
-      submitted_at: new Date().toISOString(),
-      documents: data.documents || [],
-      payment_status: 'pending',
-      payment_reference: null,
-      vendor_id: null // Will be generated after approval
+      submitted_at: application.created_at,
+      message: 'Registration successful. Please use your Vendor ID and password to login.',
+      instructions: {
+        en: 'Your account has been created successfully. You can login with your Vendor ID and the provided password.',
+        hi: 'आपका खाता सफलतापूर्वक बनाया गया है। आप अपने विक्रेता ID और दिए गए पासवर्ड से लॉगिन कर सकते हैं।'
+      }
     };
 
-    // Send application received notification
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'email',
-          recipient: contact_email,
-          templateId: 'application_received',
-          applicationId: applicationId,
-          data: {
-            vendorName: company_name,
-            applicationId: applicationId
-          }
-        })
-      });
-    } catch (notificationError) {
-      console.error('Failed to send notification:', notificationError);
-    }
-
-    return NextResponse.json(application, { status: 201 });
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
+    console.error('Vendor registration error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        success: false,
+        error: 'Registration failed. Please try again.',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const applicationId = searchParams.get('id');
-  
-  if (applicationId) {
-    // Get specific application
-    const application = VendorApplicationDB.findByApplicationId(applicationId);
-    if (!application) {
-      return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+function getUserFromToken(request: NextRequest): { id: number; email: string } | null {
+  try {
+    const authHeader = request.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '') || 
+                  request.cookies.get('access_token')?.value;
+    
+    if (!token) {
+      return null;
     }
-    return NextResponse.json(application);
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
+    return { id: decoded.userId || decoded.user_id, email: decoded.email };
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    return null;
   }
-  
-  // Get all applications for the user (mock user ID 1 for now)
-  const userId = 1;
-  const applications = VendorApplicationDB.findByUserId(userId);
-  return NextResponse.json(applications);
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const applicationId = searchParams.get('id');
+    
+    // Get authenticated user
+    const user = getUserFromToken(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (applicationId) {
+      // Get specific application
+      const application = VendorApplicationDB.findByApplicationId(applicationId);
+      if (!application) {
+        return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+      }
+      
+      // Check if user owns this application (for security)
+      if (application.user_id !== user.id) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+      
+      // Add documents to the application
+      const documents = DocumentDB.findByApplicationId(application.id);
+      const applicationWithDocs = {
+        ...application,
+        documents
+      };
+      
+      return NextResponse.json(applicationWithDocs);
+    }
+
+    // Get applications for the current user only
+    const applications = VendorApplicationDB.findByUserId(user.id);
+    return NextResponse.json(applications);
+  } catch (error) {
+    console.error('Get applications error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch applications' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PUT(request: NextRequest) {

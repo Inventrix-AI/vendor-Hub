@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link'
 import { 
   Building2, 
@@ -9,327 +11,566 @@ import {
   Zap,
   Users,
   TrendingUp,
-  Star
+  Star,
+  Phone,
+  MapPin,
+  Mail,
+  Upload,
+  User,
+  Building,
+  IndianRupee
 } from 'lucide-react'
+import { useLanguage } from '@/lib/language'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 export default function Home() {
+  const { t, language } = useLanguage();
+
   return (
-    <div className="min-h-screen">
-      {/* Modern Navigation */}
-      <nav className="bg-white/95 backdrop-blur-md border-b border-neutral-200/60 sticky top-0 z-50">
+    <div className={`min-h-screen ${language === 'hi' ? 'font-mixed' : 'font-sans'}`}>
+      {/* Government Header Strip */}
+      <div className="gov-header"></div>
+      {/* Government Style Navigation */}
+      <nav className="bg-white shadow-md border-b border-neutral-200 sticky top-0 z-50">
         <div className="container-fluid">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-neutral-900">vendorHub</span>
-            </div>
-            
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-neutral-600 hover:text-neutral-900 transition-colors">Features</a>
-              <a href="#process" className="text-neutral-600 hover:text-neutral-900 transition-colors">Process</a>
-              <a href="#contact" className="text-neutral-600 hover:text-neutral-900 transition-colors">Contact</a>
-            </div>
-            
+          <div className="flex items-center justify-between h-16 px-4 sm:px-6">
             <div className="flex items-center space-x-3">
-              <Link href="/auth/login" className="btn btn-ghost btn-sm">
-                Sign In
-              </Link>
-              <Link href="/auth/register" className="btn btn-primary btn-sm">
-                Get Started
-              </Link>
+              <div className="w-10 h-10 bg-gov-blue rounded-full flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-lg font-bold text-gov-blue leading-tight">
+                  {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
+                </span>
+                <span className="text-xs text-neutral-600">
+                  {language === 'hi' ? 'मध्यप्रदेश' : 'Madhya Pradesh'}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <LanguageSwitcher />
+              <div className="hidden md:flex items-center space-x-4 ml-4">
+                <a href="#benefits" className="text-neutral-600 hover:text-gov-blue transition-colors text-sm">
+                  {t('nav.features')}
+                </a>
+                <a href="#membership" className="text-neutral-600 hover:text-gov-blue transition-colors text-sm">
+                  {t('nav.process')}
+                </a>
+                <a href="#contact" className="text-neutral-600 hover:text-gov-blue transition-colors text-sm">
+                  {t('nav.contact')}
+                </a>
+              </div>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="section-padding gradient-subtle relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-transparent"></div>
-        <div className="container-fluid relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="animate-fade-in-up">
-              <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mb-6">
-                <Zap className="w-4 h-4 mr-2" />
-                Streamlined Vendor Onboarding
-              </div>
-              
-              <h1 className="text-display-2xl text-neutral-900 mb-6">
-                Transform Your
-                <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent"> Vendor Onboarding</span>
-              </h1>
-              
-              <p className="text-body-lg mb-8 max-w-lg">
-                Experience seamless vendor registration with secure document management, 
-                automated verification, and integrated payment processing. Built for modern businesses.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Link href="/auth/register" className="btn btn-primary btn-lg group">
-                  Start Your Application
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link href="/admin/dashboard" className="btn btn-secondary btn-lg">
-                  Admin Dashboard
-                </Link>
-              </div>
-              
-              <div className="flex items-center space-x-6 text-body-sm">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Free Setup</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>Secure Processing</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span>24/7 Support</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="relative animate-float">
-              <div className="bg-white rounded-2xl shadow-xl p-8 border border-neutral-200/60">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-neutral-500">Application Status</span>
-                    <span className="status-badge status-success">Approved</span>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-neutral-900">Business Registration</div>
-                        <div className="text-sm text-neutral-500">Completed</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FileCheck className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-neutral-900">Document Verification</div>
-                        <div className="text-sm text-neutral-500">Verified</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <CreditCard className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-neutral-900">Payment Processing</div>
-                        <div className="text-sm text-neutral-500">Completed</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                    <div className="text-sm font-medium text-green-800">Vendor ID: VND2024-001</div>
-                    <div className="text-xs text-green-600 mt-1">Welcome to the vendor network!</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="section-padding bg-white">
+      <section className="bg-gradient-to-br from-blue-50 via-white to-orange-50 py-12 md:py-16">
         <div className="container-fluid">
-          <div className="text-center mb-16">
-            <h2 className="text-display-lg text-neutral-900 mb-4">
-              Everything You Need to Onboard Vendors
-            </h2>
-            <p className="text-body-lg max-w-2xl mx-auto">
-              Our comprehensive platform handles every aspect of vendor onboarding, 
-              from initial registration to final approval.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="card group cursor-pointer">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Building2 className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="text-display-md mb-3">Smart Registration</h3>
-              <p className="text-body-md mb-4">
-                Intelligent forms that adapt to your business type with guided completion and real-time validation.
-              </p>
-              <div className="flex items-center text-blue-600 text-sm font-medium">
-                Learn more <ArrowRight className="w-4 h-4 ml-2" />
-              </div>
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center px-4 py-2 bg-gov-coral text-white rounded-full text-sm font-medium mb-6">
+              <Building2 className="w-4 h-4 mr-2" />
+              {t('hero.badge')}
             </div>
             
-            <div className="card group cursor-pointer">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Shield className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="text-display-md mb-3">Secure Verification</h3>
-              <p className="text-body-md mb-4">
-                Advanced document verification with AI-powered validation and manual review by certified experts.
-              </p>
-              <div className="flex items-center text-blue-600 text-sm font-medium">
-                Learn more <ArrowRight className="w-4 h-4 ml-2" />
-              </div>
-            </div>
+            <h1 className="text-3xl md:text-5xl font-bold text-gov-blue mb-6 leading-tight">
+              {t('hero.title.main')}<br />
+              <span className="text-gov-coral">{t('hero.title.highlight')}</span>
+            </h1>
             
-            <div className="card group cursor-pointer">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <CreditCard className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-display-md mb-3">Payment Integration</h3>
-              <p className="text-body-md mb-4">
-                Seamless payment processing with multiple payment methods and automated receipt generation.
-              </p>
-              <div className="flex items-center text-blue-600 text-sm font-medium">
-                Learn more <ArrowRight className="w-4 h-4 ml-2" />
-              </div>
-            </div>
-            
-            <div className="card group cursor-pointer">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <FileCheck className="w-6 h-6 text-orange-600" />
-              </div>
-              <h3 className="text-display-md mb-3">Real-time Tracking</h3>
-              <p className="text-body-md mb-4">
-                Live status updates with email and SMS notifications at every step of the approval process.
-              </p>
-              <div className="flex items-center text-blue-600 text-sm font-medium">
-                Learn more <ArrowRight className="w-4 h-4 ml-2" />
-              </div>
-            </div>
-            
-            <div className="card group cursor-pointer">
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Users className="w-6 h-6 text-indigo-600" />
-              </div>
-              <h3 className="text-display-md mb-3">Admin Dashboard</h3>
-              <p className="text-body-md mb-4">
-                Powerful admin tools with analytics, bulk operations, and comprehensive reporting capabilities.
-              </p>
-              <div className="flex items-center text-blue-600 text-sm font-medium">
-                Learn more <ArrowRight className="w-4 h-4 ml-2" />
-              </div>
-            </div>
-            
-            <div className="card group cursor-pointer">
-              <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-6 h-6 text-pink-600" />
-              </div>
-              <h3 className="text-display-md mb-3">Analytics & Reports</h3>
-              <p className="text-body-md mb-4">
-                Detailed insights into your onboarding process with custom reports and performance metrics.
-              </p>
-              <div className="flex items-center text-blue-600 text-sm font-medium">
-                Learn more <ArrowRight className="w-4 h-4 ml-2" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Process Section */}
-      <section id="process" className="section-padding gradient-subtle">
-        <div className="container-narrow">
-          <div className="text-center mb-16">
-            <h2 className="text-display-lg text-neutral-900 mb-4">
-              Simple 4-Step Process
-            </h2>
-            <p className="text-body-lg">
-              Get from application to approval in just a few simple steps
-            </p>
-          </div>
-          
-          <div className="space-y-8">
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl flex items-center justify-center text-xl font-bold shadow-lg">
-                1
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-display-md mb-2">Register & Submit Application</h3>
-                <p className="text-body-md">
-                  Create your account and submit your business application with basic company information.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl flex items-center justify-center text-xl font-bold shadow-lg">
-                2
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-display-md mb-2">Upload Required Documents</h3>
-                <p className="text-body-md">
-                  Securely upload business licenses, tax certificates, and identity documents with version control.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl flex items-center justify-center text-xl font-bold shadow-lg">
-                3
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-display-md mb-2">Complete Payment Process</h3>
-                <p className="text-body-md">
-                  Make secure payment for application processing using our integrated payment system.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-xl flex items-center justify-center text-xl font-bold shadow-lg">
-                4
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-display-md mb-2">Get Approved & Start Business</h3>
-                <p className="text-body-md">
-                  Receive approval notification and your unique vendor ID to start doing business with us.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="section-padding bg-white">
-        <div className="container-narrow text-center">
-          <div className="card-spacious">
-            <h2 className="text-display-lg text-neutral-900 mb-4">
-              Ready to Transform Your Vendor Onboarding?
-            </h2>
-            <p className="text-body-lg mb-8 max-w-2xl mx-auto">
-              Join thousands of businesses who have streamlined their vendor onboarding process with vendorHub.
+            <p className="text-lg md:text-xl text-neutral-700 mb-8 max-w-3xl mx-auto leading-relaxed">
+              {t('hero.subtitle')}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Link href="/auth/register" className="btn btn-primary btn-lg group">
-                Start Free Trial
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              <Link href="/vendor/register" className="btn bg-gov-coral hover:bg-red-500 text-white px-8 py-4 text-lg font-semibold rounded-lg shadow-lg transition-all transform hover:scale-105">
+                {t('hero.startApplication')}
+                <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
-              <Link href="/admin/reports" className="btn btn-secondary btn-lg">
-                View Demo
+              <Link href="/auth/login" className="btn bg-white text-gov-blue border-2 border-gov-blue hover:bg-blue-50 px-8 py-4 text-lg font-semibold rounded-lg transition-all">
+                {t('nav.signIn')}
               </Link>
             </div>
             
-            <div className="flex items-center justify-center space-x-6 text-body-sm">
-              <div className="flex items-center space-x-1">
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <span className="ml-2 text-neutral-600">5.0 (124 reviews)</span>
+            <div className="flex flex-wrap justify-center gap-4 text-sm">
+              <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm">
+                <CheckCircle className="w-5 h-5 text-gov-teal" />
+                <span>{language === 'hi' ? 'सुरक्षित प्रक्रिया' : 'Secure Process'}</span>
+              </div>
+              <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm">
+                <CheckCircle className="w-5 h-5 text-gov-teal" />
+                <span>{language === 'hi' ? 'तुरंत अप्रूवल' : 'Quick Approval'}</span>
+              </div>
+              <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm">
+                <CheckCircle className="w-5 h-5 text-gov-teal" />
+                <span>{language === 'hi' ? 'आसान प्रक्रिया' : 'Easy Process'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Introduction Section - Enhanced */}
+      <section id="introduction" className="bg-white py-16 md:py-20">
+        <div className="container-fluid">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              {/* Left Content */}
+              <div className="space-y-6">
+                <div className="inline-flex items-center px-4 py-2 bg-blue-100 text-gov-blue rounded-full text-sm font-medium">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  {language === 'hi' ? 'संगठन परिचय' : 'About Organization'}
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gov-blue leading-tight">
+                  {t('intro.title')}
+                </h2>
+                <div className="space-y-4 text-lg leading-relaxed">
+                  <p className="text-gov-blue font-semibold text-xl">{t('intro.greeting')}</p>
+                  <p className="text-neutral-700">{t('intro.description')}</p>
+                </div>
+                
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 gap-6 pt-6">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gov-blue">500+</div>
+                    <div className="text-sm text-neutral-600">
+                      {language === 'hi' ? 'सक्रिय सदस्य' : 'Active Members'}
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-orange-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gov-coral">100%</div>
+                    <div className="text-sm text-neutral-600">
+                      {language === 'hi' ? 'सुरक्षित प्रक्रिया' : 'Secure Process'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Visual */}
+              <div className="relative">
+                <div className="bg-gradient-to-br from-gov-blue to-gov-coral rounded-2xl p-8 text-white">
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <Building2 className="w-20 h-20 mx-auto mb-4 opacity-80" />
+                      <h3 className="text-xl font-bold mb-2">
+                        {language === 'hi' ? 'एक मजबूत संगठन' : 'A Strong Organization'}
+                      </h3>
+                      <p className="text-sm opacity-90">
+                        {language === 'hi' 
+                          ? 'सभी विक्रेताओं के लिए एकजुट मंच' 
+                          : 'United platform for all vendors'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Floating elements */}
+                <div className="absolute -top-4 -left-4 w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
+                <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-gov-teal rounded-full flex items-center justify-center shadow-lg">
+                  <TrendingUp className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Membership Benefits Section - Enhanced */}
+      <section id="benefits" className="bg-white py-16 md:py-20">
+        <div className="container-fluid">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium mb-6">
+                <Star className="w-4 h-4 mr-2" />
+                {language === 'hi' ? 'सदस्यता के फायदे' : 'Membership Benefits'}
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-gov-blue mb-4">
+                {t('benefits.title')}
+              </h2>
+              <p className="text-xl text-neutral-600 max-w-3xl mx-auto">
+                {language === 'hi' 
+                  ? 'हमारे संगठन से जुड़कर पाएं अनेक लाभ' 
+                  : 'Join our organization and get numerous benefits'}
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Benefit 1 */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 hover:shadow-lg transition-all transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-gov-blue rounded-2xl flex items-center justify-center mb-6">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'एकता और संगठन' : 'Unity & Organization'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('benefits.unity')}
+                </p>
+              </div>
+              
+              {/* Benefit 2 */}
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-8 hover:shadow-lg transition-all transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-gov-teal rounded-2xl flex items-center justify-center mb-6">
+                  <TrendingUp className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'व्यवसाय विकास' : 'Business Growth'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('benefits.goals')}
+                </p>
+              </div>
+              
+              {/* Benefit 3 */}
+              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-8 hover:shadow-lg transition-all transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-gov-coral rounded-2xl flex items-center justify-center mb-6">
+                  <Shield className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'सहायता और सुरक्षा' : 'Support & Protection'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('benefits.support')}
+                </p>
+              </div>
+              
+              {/* Benefit 4 */}
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-8 hover:shadow-lg transition-all transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center mb-6">
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'निर्णय में सहभागिता' : 'Decision Participation'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('benefits.decision')}
+                </p>
+              </div>
+              
+              {/* Benefit 5 */}
+              <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-8 hover:shadow-lg transition-all transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-yellow-600 rounded-2xl flex items-center justify-center mb-6">
+                  <Building className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'संसाधन और सुविधाएं' : 'Resources & Facilities'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('benefits.resources')}
+                </p>
+              </div>
+
+              {/* Additional Benefit */}
+              <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl p-8 hover:shadow-lg transition-all transform hover:-translate-y-2">
+                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6">
+                  <Zap className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'तत्काल समाधान' : 'Quick Solutions'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {language === 'hi' 
+                    ? 'व्यापारिक समस्याओं का तुरंत समाधान और सलाह प्राप्त करें'
+                    : 'Get instant solutions and advice for business problems'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Requirements for Membership Section */}
+      <section id="requirements" className="bg-gray-50 py-16 md:py-20">
+        <div className="container-fluid">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm font-medium mb-6">
+                <FileCheck className="w-4 h-4 mr-2" />
+                {language === 'hi' ? 'आवश्यकताएं' : 'Requirements'}
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-gov-blue mb-4">
+                {t('membership.title')}
+              </h2>
+              <p className="text-xl text-neutral-600 max-w-3xl mx-auto">
+                {language === 'hi' 
+                  ? 'सदस्यता के लिए निम्नलिखित आवश्यकताओं को पूरा करें' 
+                  : 'Meet the following requirements for membership'}
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {/* Requirement 1 */}
+              <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all">
+                <div className="w-16 h-16 bg-gov-coral rounded-2xl flex items-center justify-center mb-6">
+                  <User className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'आयु सीमा' : 'Age Requirement'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('membership.age')}
+                </p>
+                <div className="mt-4 p-3 bg-red-50 rounded-lg">
+                  <p className="text-sm font-semibold text-red-700">
+                    {language === 'hi' ? '✓ न्यूनतम 18 वर्ष' : '✓ Minimum 18 years'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Requirement 2 */}
+              <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all">
+                <div className="w-16 h-16 bg-gov-blue rounded-2xl flex items-center justify-center mb-6">
+                  <Building className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'व्यवसाय प्रकार' : 'Business Type'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('membership.retailer')}
+                </p>
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm font-semibold text-blue-700">
+                    {language === 'hi' ? '✓ खुदरा विक्रेता' : '✓ Retail Vendor'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Requirement 3 */}
+              <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all">
+                <div className="w-16 h-16 bg-gov-teal rounded-2xl flex items-center justify-center mb-6">
+                  <FileCheck className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'दस्तावेज़' : 'Documents'}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed">
+                  {t('membership.id')}
+                </p>
+                <div className="mt-4 p-3 bg-teal-50 rounded-lg">
+                  <p className="text-sm font-semibold text-teal-700">
+                    {language === 'hi' ? '✓ पहचान पत्र आवश्यक' : '✓ ID Proof Required'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Membership Fee - Integrated as 4th Card */}
+              <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all">
+                <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mb-6">
+                  <IndianRupee className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gov-blue mb-4">
+                  {t('membershipFee.title')}
+                </h3>
+                <p className="text-neutral-700 leading-relaxed mb-4">
+                  {t('membershipFee.duration')}
+                </p>
+                <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                  <p className="text-lg font-bold text-green-700">
+                    ₹151 {language === 'hi' ? '/ वर्ष' : '/ year'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How to Become a Member - Enhanced Steps Section */}
+      <section id="membership-process" className="bg-gradient-to-br from-blue-50 to-orange-50 py-16 md:py-20">
+        <div className="container-fluid">
+          <div className="max-w-6xl mx-auto">
+            {/* Section Header */}
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center px-4 py-2 bg-white text-gov-blue rounded-full text-sm font-medium mb-6 shadow-sm">
+                <ArrowRight className="w-4 h-4 mr-2" />
+                {language === 'hi' ? 'सदस्यता प्रक्रिया' : 'Membership Process'}
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-gov-blue mb-4">
+                {language === 'hi' ? 'सदस्य बनने की प्रक्रिया' : 'Proceed to Become a Member'}
+              </h2>
+              <p className="text-xl text-neutral-600 mb-8">
+                {language === 'hi' 
+                  ? '4 आसान चरणों में सदस्यता प्राप्त करें' 
+                  : 'Get membership in 4 easy steps'}
+              </p>
+            </div>
+            
+            {/* Progress Flow */}
+            <div className="relative mb-16">
+              {/* Connecting Line */}
+              <div className="hidden lg:block absolute top-16 left-1/2 transform -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-gov-coral via-gov-blue via-gov-teal to-yellow-500 rounded-full"></div>
+              
+              {/* Steps */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
+                {/* Step 1 */}
+                <div className="relative">
+                  <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2 h-full">
+                    <div className="text-center h-full flex flex-col">
+                      <div className="relative mb-6">
+                        <div className="w-24 h-24 bg-gradient-to-br from-gov-coral to-red-400 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto shadow-lg">
+                          1
+                        </div>
+                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2">
+                          <div className="w-10 h-10 bg-white border-4 border-gov-coral rounded-full flex items-center justify-center shadow-sm">
+                            <User className="w-5 h-5 text-gov-coral" />
+                          </div>
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold text-gov-blue mb-4">
+                        {language === 'hi' ? 'व्यक्तिगत जानकारी' : 'Personal Information'}
+                      </h3>
+                      <div className="space-y-2 text-sm text-neutral-600 flex-grow">
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-coral rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'नाम और आयु' : 'Name & Age'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-coral rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'मोबाइल नंबर' : 'Mobile Number'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-coral rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'पहचान पत्र' : 'ID Proof'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-coral rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'फोटो' : 'Photo'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="relative">
+                  <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2 h-full">
+                    <div className="text-center h-full flex flex-col">
+                      <div className="relative mb-6">
+                        <div className="w-24 h-24 bg-gradient-to-br from-gov-blue to-blue-500 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto shadow-lg">
+                          2
+                        </div>
+                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2">
+                          <div className="w-10 h-10 bg-white border-4 border-gov-blue rounded-full flex items-center justify-center shadow-sm">
+                            <Building className="w-5 h-5 text-gov-blue" />
+                          </div>
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold text-gov-blue mb-4">
+                        {language === 'hi' ? 'व्यवसाय विवरण' : 'Business Details'}
+                      </h3>
+                      <div className="space-y-2 text-sm text-neutral-600 flex-grow">
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-blue rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'दुकान का नाम' : 'Shop Name'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-blue rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'व्यवसाय प्रकार' : 'Business Type'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="relative">
+                  <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2 h-full">
+                    <div className="text-center h-full flex flex-col">
+                      <div className="relative mb-6">
+                        <div className="w-24 h-24 bg-gradient-to-br from-gov-teal to-teal-400 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto shadow-lg">
+                          3
+                        </div>
+                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2">
+                          <div className="w-10 h-10 bg-white border-4 border-gov-teal rounded-full flex items-center justify-center shadow-sm">
+                            <FileCheck className="w-5 h-5 text-gov-teal" />
+                          </div>
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold text-gov-blue mb-4">
+                        {language === 'hi' ? 'पता और दस्तावेज़' : 'Address & Documents'}
+                      </h3>
+                      <div className="space-y-2 text-sm text-neutral-600 flex-grow">
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-teal rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'पूरा पता' : 'Complete Address'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-teal rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'दुकान के दस्तावेज़' : 'Shop Documents'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-gov-teal rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'दुकान की तस्वीर' : 'Shop Photo'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="relative">
+                  <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2 h-full">
+                    <div className="text-center h-full flex flex-col">
+                      <div className="relative mb-6">
+                        <div className="w-24 h-24 bg-gradient-to-br from-yellow-500 to-yellow-400 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto shadow-lg">
+                          4
+                        </div>
+                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2">
+                          <div className="w-10 h-10 bg-white border-4 border-yellow-500 rounded-full flex items-center justify-center shadow-sm">
+                            <IndianRupee className="w-5 h-5 text-yellow-600" />
+                          </div>
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold text-gov-blue mb-4">
+                        {language === 'hi' ? 'भुगतान और पुष्टि' : 'Payment & Confirmation'}
+                      </h3>
+                      <div className="space-y-2 text-sm text-neutral-600 flex-grow">
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? '₹151 भुगतान' : '₹151 Payment'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'यूनीक ID प्राप्त करें' : 'Get Unique ID'}</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full flex-shrink-0"></div>
+                          <span>{language === 'hi' ? 'तुरंत खाता सक्रिय' : 'Instant Activation'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Call to Action */}
+            <div className="text-center">
+              <div className="bg-white rounded-2xl p-8 shadow-lg max-w-2xl mx-auto">
+                <h3 className="text-2xl font-bold text-gov-blue mb-4">
+                  {language === 'hi' ? 'अभी शुरू करें!' : 'Get Started Now!'}
+                </h3>
+                <p className="text-neutral-600 mb-6">
+                  {language === 'hi' 
+                    ? 'केवल 10 मिनट में अपनी सदस्यता पूरी करें'
+                    : 'Complete your membership in just 10 minutes'}
+                </p>
+                <Link 
+                  href="/vendor/register" 
+                  className="bg-gradient-to-r from-gov-coral to-red-500 hover:from-red-500 hover:to-gov-coral text-white px-10 py-4 rounded-xl font-bold text-lg transition-all transform hover:scale-105 shadow-lg inline-flex items-center"
+                >
+                  {language === 'hi' ? 'सदस्यता के लिए आवेदन करें' : 'Apply for Membership'}
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Link>
+                <p className="text-sm text-neutral-500 mt-4">
+                  {language === 'hi' 
+                    ? '✓ सुरक्षित प्रक्रिया • ✓ तुरंत अप्रूवल • ✓ आसान प्रक्रिया' 
+                    : '✓ Secure Process • ✓ Quick Approval • ✓ Easy Process'}
+                </p>
               </div>
             </div>
           </div>
@@ -337,51 +578,81 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer id="contact" className="bg-neutral-900 text-neutral-300 section-padding-sm">
+      <footer id="contact" className="bg-gray-900 text-white py-12">
         <div className="container-fluid">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-white" />
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-12 h-12 bg-gov-coral rounded-full flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-xl font-bold text-white">vendorHub</span>
+                <div>
+                  <h3 className="text-lg font-bold">
+                    {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
+                  </h3>
+                  <p className="text-sm opacity-80">
+                    {language === 'hi' ? 'मध्यप्रदेश' : 'Madhya Pradesh'}
+                  </p>
+                </div>
               </div>
-              <p className="text-body-sm mb-4">
-                Streamlining vendor onboarding with modern technology and exceptional user experience.
+              <p className="text-sm opacity-90 leading-relaxed">
+                {language === 'hi' 
+                  ? 'खुदरा विक्रेताओं के लिए एकता, सहयोग और विकास का मंच'
+                  : 'A platform for unity, cooperation and development for retail vendors'}
               </p>
             </div>
             
             <div>
-              <h4 className="font-semibold text-white mb-4">Product</h4>
-              <ul className="space-y-2 text-body-sm">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#process" className="hover:text-white transition-colors">How it Works</a></li>
-                <li><a href="/admin/reports" className="hover:text-white transition-colors">Analytics</a></li>
-              </ul>
+              <h4 className="font-semibold text-lg mb-4">
+                {language === 'hi' ? 'संपर्क जानकारी' : 'Contact Information'}
+              </h4>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center space-x-2">
+                  <Phone className="w-4 h-4" />
+                  <span>+91 12345 67890</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4" />
+                  <span>info@pathvikretasangh.org</span>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <MapPin className="w-4 h-4 mt-1" />
+                  <span>
+                    {language === 'hi' 
+                      ? 'मध्यप्रदेश, भारत' 
+                      : 'Madhya Pradesh, India'}
+                  </span>
+                </div>
+              </div>
             </div>
             
             <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-body-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold text-white mb-4">Company</h4>
-              <ul className="space-y-2 text-body-sm">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
+              <h4 className="font-semibold text-lg mb-4">
+                {language === 'hi' ? 'महत्वपूर्ण लिंक' : 'Important Links'}
+              </h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#benefits" className="hover:text-gov-coral transition-colors">
+                  {language === 'hi' ? 'संगठन के लाभ' : 'Organization Benefits'}
+                </a></li>
+                <li><a href="#membership" className="hover:text-gov-coral transition-colors">
+                  {language === 'hi' ? 'सदस्यता' : 'Membership'}
+                </a></li>
+                <li><a href="#membership-form" className="hover:text-gov-coral transition-colors">
+                  {language === 'hi' ? 'आवेदन फार्म' : 'Application Form'}
+                </a></li>
+                <li><a href="/admin/dashboard" className="hover:text-gov-coral transition-colors">
+                  {language === 'hi' ? 'एडमिन डैशबोर्ड' : 'Admin Dashboard'}
+                </a></li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-neutral-800 pt-8 text-center text-body-sm">
-            <p>&copy; 2024 vendorHub. All rights reserved.</p>
+          <div className="border-t border-blue-800 pt-6 text-center">
+            <div className="gov-header mb-4"></div>
+            <p className="text-sm opacity-90">
+              &copy; 2024 {language === 'hi' ? 'पथ विक्रेता एकता संघ मध्यप्रदेश' : 'Path Vikreta Ekta Sangh Madhya Pradesh'}. 
+              {language === 'hi' ? 'सभी अधिकार सुरक्षित' : 'All rights reserved'}.
+            </p>
           </div>
         </div>
       </footer>

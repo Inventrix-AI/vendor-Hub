@@ -252,6 +252,12 @@ export const DocumentDB = {
     const db = getDatabase();
     const stmt = db.prepare('SELECT * FROM documents WHERE application_id = ? AND is_current = 1 ORDER BY created_at DESC');
     return stmt.all(applicationId);
+  },
+  
+  findById: (documentId: number) => {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM documents WHERE id = ? AND is_current = 1');
+    return stmt.get(documentId);
   }
 };
 
