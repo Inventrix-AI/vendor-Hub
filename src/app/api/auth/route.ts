@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
 
           result = { user, token };
         } else {
-          // Use database for local development - support both email and vendor ID login
-          const { UserDB, VendorApplicationDB } = await import('@/lib/database');
+          // Use database for local/production - support both email and vendor ID login
+          const { UserDB, VendorApplicationDB } = await import('@/lib/db');
           
           let user = null;
           
@@ -114,9 +114,9 @@ export async function POST(request: NextRequest) {
           if (loginIdentifier.includes('@')) {
             user = await UserDB.findByEmail(loginIdentifier);
           } else {
-            // Try to find by vendor ID or application ID
-            if (loginIdentifier.startsWith('PVS') || loginIdentifier.startsWith('APP')) {
-              const application = await VendorApplicationDB.findByApplicationId(loginIdentifier);
+            // Try to find by vendor ID (PVS prefix)
+            if (loginIdentifier.startsWith('PVS')) {
+              const application = await VendorApplicationDB.findByVendorId(loginIdentifier);
               if (application) {
                 user = await UserDB.findById((application as any).user_id);
               }

@@ -40,7 +40,7 @@ export function middleware(request: NextRequest) {
     
     try {
       // Verify JWT token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key') as any
       
       // Check role-based access
       if (pathname.startsWith('/admin') && 

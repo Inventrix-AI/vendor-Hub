@@ -582,37 +582,41 @@ export default function VendorRegisterPage() {
       if (result.success) {
         // Show success message
         toast.success(
-          language === "hi" ? result.instructions.hi : result.instructions.en
+          language === "hi" 
+            ? "पंजीकरण डेटा वैलिडेट हो गया है। कृपया भुगतान पूरा करें।" 
+            : "Registration data validated. Please complete payment."
         );
 
-        // Show credentials
-        setCredentials({
-          vendorId: result.vendor_id,
-          applicationId: result.application_id,
-          password: result.temporary_password,
-        });
-        setShowCredentialsModal(true);
+        // Show credentials from payment details
+        if (result.payment_details) {
+          setCredentials({
+            vendorId: result.payment_details.vendor_id,
+            applicationId: result.payment_details.application_id,
+            password: result.payment_details.temporary_password || 'Not available yet',
+          });
+          setShowCredentialsModal(true);
+        }
 
         // Integrate Razorpay payment with better error handling
-        if (result.payment && window.Razorpay) {
+        if (result.payment_details && window.Razorpay) {
           try {
             console.log("Initializing Razorpay with:", {
-              key: result.payment.razorpay_key,
-              amount: result.payment.amount,
-              order_id: result.payment.order_id,
+              key: result.payment_details.razorpay_key,
+              amount: result.payment_details.amount,
+              order_id: result.payment_details.order_id,
             });
 
             const options = {
-              key: result.payment.razorpay_key,
-              amount: result.payment.amount,
-              currency: result.payment.currency,
+              key: result.payment_details.razorpay_key,
+              amount: result.payment_details.amount,
+              currency: result.payment_details.currency,
               name:
                 language === "hi"
                   ? "पथ विक्रेता एकता संघ"
                   : "Path Vikreta Ekta Sangh",
               description:
                 language === "hi" ? "सदस्यता शुल्क" : "Membership Fee",
-              order_id: result.payment.order_id,
+              order_id: result.payment_details.order_id,
               handler: async function (response: any) {
                 try {
                   // Verify payment
@@ -625,7 +629,6 @@ export default function VendorRegisterPage() {
                       razorpay_order_id: response.razorpay_order_id,
                       razorpay_payment_id: response.razorpay_payment_id,
                       razorpay_signature: response.razorpay_signature,
-                      application_id: result.application_id,
                     }),
                   });
 
@@ -640,10 +643,10 @@ export default function VendorRegisterPage() {
 
                     // Redirect to success page with credentials
                     const successParams = new URLSearchParams({
-                      applicationId: result.application_id,
-                      vendorId: result.vendor_id,
-                      username: result.username,
-                      password: result.temporary_password,
+                      applicationId: verifyResult.applicationId,
+                      vendorId: verifyResult.vendorId,
+                      email: verifyResult.email,
+                      password: verifyResult.temporaryPassword,
                       paymentId: response.razorpay_payment_id,
                     });
 
@@ -666,7 +669,7 @@ export default function VendorRegisterPage() {
               },
               prefill: {
                 name: data.name,
-                email: data.email || `${result.username}@pathvikreta.org`,
+                email: data.email || `${result.payment_details.vendor_id}@pathvikreta.org`,
                 contact: data.mobile,
               },
               theme: {
@@ -698,16 +701,12 @@ export default function VendorRegisterPage() {
               : "Payment gateway failed to load. You can complete payment later."
           );
 
-          // Redirect to success page without payment for now
-          const successParams = new URLSearchParams({
-            applicationId: result.application_id,
-            vendorId: result.vendor_id,
-            username: result.username,
-            password: result.temporary_password,
-            paymentStatus: "pending",
-          });
-
-          router.push(`/vendor/success?${successParams.toString()}`);
+          // Redirect to registration page to retry
+          toast.info(
+            language === "hi"
+              ? "कृपया पेज रिलोड करें और भुगतान दोबारा कोशिश करें।"
+              : "Please reload the page and try payment again."
+          );
         }
       } else {
         throw new Error(result.error || "Registration failed");

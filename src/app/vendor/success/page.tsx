@@ -13,6 +13,7 @@ export default function SuccessPage() {
   const { language } = useLanguage();
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState<{ [key: string]: boolean }>({});
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Get data from URL params
   const applicationId = searchParams.get('applicationId');
@@ -90,6 +91,63 @@ ${language === 'hi' ? 'तारीख:' : 'Date:'} ${new Date().toLocaleString(
 
   const handleLogin = () => {
     router.push('/auth/login');
+  };
+
+  const handleAutoLogin = async () => {
+    if (!vendorId || !password) {
+      toast.error(
+        language === 'hi' 
+          ? 'लॉगिन क्रेडेंशियल्स उपलब्ध नहीं हैं' 
+          : 'Login credentials not available'
+      );
+      return;
+    }
+
+    setIsLoggingIn(true);
+    
+    try {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'login',
+          username: vendorId,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.access_token) {
+        // Store token in localStorage
+        localStorage.setItem('authToken', data.access_token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        toast.success(
+          language === 'hi' 
+            ? 'स्वचालित लॉगिन सफल! डैशबोर्ड पर रीडायरेक्ट कर रहे हैं...' 
+            : 'Auto-login successful! Redirecting to dashboard...'
+        );
+        
+        // Redirect to vendor dashboard
+        setTimeout(() => {
+          router.push('/vendor/dashboard');
+        }, 1500);
+      } else {
+        throw new Error(data.error || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Auto-login failed:', error);
+      toast.error(
+        language === 'hi' 
+          ? 'स्वचालित लॉगिन विफल। कृपया मैन्युअल रूप से लॉगिन करें।' 
+          : 'Auto-login failed. Please login manually.'
+      );
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   if (!applicationId) {
@@ -276,6 +334,24 @@ ${language === 'hi' ? 'तारीख:' : 'Date:'} ${new Date().toLocaleString(
                 <Download className="w-5 h-5" />
                 <span>{language === 'hi' ? 'डाउनलोड करें' : 'Download'}</span>
               </button>
+              
+              <button
+                onClick={handleAutoLogin}
+                disabled={isLoggingIn}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>{language === 'hi' ? 'लॉगिन हो रहा है...' : 'Logging in...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="w-5 h-5" />
+                    <span>{language === 'hi' ? 'डैशबोर्ड में जाएं' : 'Go to Dashboard'}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -318,23 +394,28 @@ ${language === 'hi' ? 'तारीख:' : 'Date:'} ${new Date().toLocaleString(
             </ul>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={handleTrackApplication}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
-            >
-              <FileText className="w-5 h-5" />
-              <span>{language === 'hi' ? 'आवेदन ट्रैक करें' : 'Track Application'}</span>
-            </button>
-            
-            <button
-              onClick={handleLogin}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
-            >
-              <ArrowRight className="w-5 h-5" />
-              <span>{language === 'hi' ? 'लॉगिन करें' : 'Login'}</span>
-            </button>
+          {/* Alternative Actions */}
+          <div className="bg-gray-50 rounded-2xl p-6">
+            <h4 className="font-bold text-gray-900 mb-4">
+              {language === 'hi' ? 'अन्य विकल्प:' : 'Other Options:'}
+            </h4>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={handleTrackApplication}
+                className="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+              >
+                <FileText className="w-5 h-5" />
+                <span>{language === 'hi' ? 'आवेदन ट्रैक करें' : 'Track Application'}</span>
+              </button>
+              
+              <button
+                onClick={handleLogin}
+                className="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+              >
+                <ArrowRight className="w-5 h-5" />
+                <span>{language === 'hi' ? 'मैन्युअल लॉगिन' : 'Manual Login'}</span>
+              </button>
+            </div>
           </div>
 
           <div className="text-center mt-8">

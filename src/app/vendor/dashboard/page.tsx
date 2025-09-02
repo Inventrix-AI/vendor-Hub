@@ -1,37 +1,39 @@
-'use client'
+"use client";
 
-import React from 'react'
-import { useQuery } from 'react-query'
-import Link from 'next/link'
-import { Layout } from '@/components/Layout'
-import { vendorApi, paymentApi } from '@/lib/api'
-import { useAuth } from '@/lib/auth'
-import { 
-  Plus, 
-  FileText, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import React from "react";
+import { useQuery } from "react-query";
+import Link from "next/link";
+import { Layout } from "@/components/Layout";
+import { vendorApi, paymentApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import {
+  Plus,
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
   CreditCard,
   Eye,
   Calendar,
   AlertTriangle,
-  RefreshCw
-} from 'lucide-react'
-import { VendorApplication, Payment } from '@/types'
+  RefreshCw,
+} from "lucide-react";
+import { VendorApplication, Payment } from "@/types";
 
 // Subscription status component
 function SubscriptionStatusCard({ vendorId }: { vendorId?: string }) {
   const { data: subscriptionStatus, isLoading } = useQuery(
-    ['subscription-status', vendorId],
+    ["subscription-status", vendorId],
     async () => {
-      if (!vendorId) return null
-      const response = await fetch(`/api/renewal?vendorId=${vendorId}&action=status`)
-      if (!response.ok) return null
-      return response.json()
+      if (!vendorId) return null;
+      const response = await fetch(
+        `/api/renewal?vendorId=${vendorId}&action=status`
+      );
+      if (!response.ok) return null;
+      return response.json();
     },
     { enabled: !!vendorId }
-  )
+  );
 
   if (isLoading || !subscriptionStatus) {
     return (
@@ -41,36 +43,52 @@ function SubscriptionStatusCard({ vendorId }: { vendorId?: string }) {
           <div className="h-8 bg-gray-300 rounded w-1/2"></div>
         </div>
       </div>
-    )
+    );
   }
 
   const getStatusColor = (status: string, daysLeft: number) => {
-    if (status === 'expired') return 'bg-red-50 border-red-200 text-red-900'
-    if (status === 'expiring_soon' || daysLeft <= 30) return 'bg-yellow-50 border-yellow-200 text-yellow-900'
-    return 'bg-green-50 border-green-200 text-green-900'
-  }
+    if (status === "expired") return "bg-red-50 border-red-200 text-red-900";
+    if (status === "expiring_soon" || daysLeft <= 30)
+      return "bg-yellow-50 border-yellow-200 text-yellow-900";
+    return "bg-green-50 border-green-200 text-green-900";
+  };
 
   const getStatusIcon = (status: string, daysLeft: number) => {
-    if (status === 'expired') return <XCircle className="h-6 w-6 text-red-500" />
-    if (status === 'expiring_soon' || daysLeft <= 30) return <AlertTriangle className="h-6 w-6 text-yellow-500" />
-    return <CheckCircle className="h-6 w-6 text-green-500" />
-  }
+    if (status === "expired")
+      return <XCircle className="h-6 w-6 text-red-500" />;
+    if (status === "expiring_soon" || daysLeft <= 30)
+      return <AlertTriangle className="h-6 w-6 text-yellow-500" />;
+    return <CheckCircle className="h-6 w-6 text-green-500" />;
+  };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'active': return 'Active'
-      case 'expiring_soon': return 'Expiring Soon'
-      case 'expired': return 'Expired'
-      case 'no_subscription': return 'No Subscription'
-      default: return 'Unknown'
+      case "active":
+        return "Active";
+      case "expiring_soon":
+        return "Expiring Soon";
+      case "expired":
+        return "Expired";
+      case "no_subscription":
+        return "No Subscription";
+      default:
+        return "Unknown";
     }
-  }
+  };
 
   return (
-    <div className={`card border-2 ${getStatusColor(subscriptionStatus.status, subscriptionStatus.daysUntilExpiry)}`}>
+    <div
+      className={`card border-2 ${getStatusColor(
+        subscriptionStatus.status,
+        subscriptionStatus.daysUntilExpiry
+      )}`}
+    >
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3">
-          {getStatusIcon(subscriptionStatus.status, subscriptionStatus.daysUntilExpiry)}
+          {getStatusIcon(
+            subscriptionStatus.status,
+            subscriptionStatus.daysUntilExpiry
+          )}
           <div>
             <h3 className="text-lg font-semibold">Subscription Status</h3>
             <p className="text-sm opacity-75">
@@ -78,8 +96,8 @@ function SubscriptionStatusCard({ vendorId }: { vendorId?: string }) {
             </p>
           </div>
         </div>
-        
-        {subscriptionStatus.status !== 'no_subscription' && (
+
+        {subscriptionStatus.status !== "no_subscription" && (
           <div className="text-right">
             <div className="text-2xl font-bold">
               {subscriptionStatus.daysUntilExpiry}
@@ -89,78 +107,141 @@ function SubscriptionStatusCard({ vendorId }: { vendorId?: string }) {
         )}
       </div>
 
-      {subscriptionStatus.expiresAt && (
+      {(subscriptionStatus.expiresAt || subscriptionStatus.activatedAt) && (
         <div className="mt-4 pt-4 border-t border-current border-opacity-20">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4" />
-              <span>Expires: {new Date(subscriptionStatus.expiresAt).toLocaleDateString()}</span>
-            </div>
-            
-            {(subscriptionStatus.status === 'expiring_soon' || subscriptionStatus.status === 'expired') && (
-              <Link 
-                href={`/vendor/renewal?vendor_id=${vendorId}`}
-                className="flex items-center space-x-1 px-3 py-1 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition-colors"
-              >
-                <RefreshCw className="h-3 w-3" />
-                <span>Renew Now</span>
-              </Link>
+          <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+            {subscriptionStatus.activatedAt && (
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4" />
+                <div>
+                  <div className="font-medium opacity-75">Start Date</div>
+                  <div>
+                    {new Date(
+                      subscriptionStatus.activatedAt
+                    ).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+            {subscriptionStatus.expiresAt && (
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4" />
+                <div>
+                  <div className="font-medium opacity-75">End Date</div>
+                  <div>
+                    {new Date(subscriptionStatus.expiresAt).toLocaleDateString(
+                      "en-IN",
+                      {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      }
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
+
+          {(subscriptionStatus.status === "expiring_soon" ||
+            subscriptionStatus.status === "expired") && (
+            <Link
+              href={`/vendor/renewal?vendor_id=${vendorId}`}
+              className="flex items-center justify-center space-x-2 w-full px-3 py-2 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition-colors text-sm font-medium"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Renew Subscription</span>
+            </Link>
+          )}
         </div>
       )}
     </div>
-  )
+  );
 }
 
 export default function VendorDashboard() {
-  const { user } = useAuth()
-  
-  const { data: applications, isLoading: applicationsLoading } = useQuery<VendorApplication[]>(
-    'vendor-applications',
-    vendorApi.getApplications
-  )
+  const { user } = useAuth();
+
+  const { data: applications, isLoading: applicationsLoading } = useQuery<
+    VendorApplication[]
+  >("vendor-applications", vendorApi.getApplications);
 
   // Get vendor ID from approved applications
-  const approvedApplication = applications?.find(app => app.status === 'approved' && app.vendor_id)
-  const vendorId = approvedApplication?.vendor_id
-  
+  const approvedApplication = applications?.find(
+    (app) => app.status === "approved" && app.vendor_id
+  );
+  const vendorId = approvedApplication?.vendor_id;
+
   const { data: payments, isLoading: paymentsLoading } = useQuery<Payment[]>(
-    'payment-history',
+    "payment-history",
     paymentApi.getPaymentHistory
-  )
+  );
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'approved':
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case 'rejected':
-        return <XCircle className="h-5 w-5 text-red-500" />
-      case 'under_review':
-        return <Clock className="h-5 w-5 text-blue-500" />
-      case 'payment_pending':
-        return <CreditCard className="h-5 w-5 text-yellow-500" />
+      case "approved":
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case "rejected":
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case "under_review":
+        return <Clock className="h-5 w-5 text-blue-500" />;
+      case "payment_pending":
+        return <CreditCard className="h-5 w-5 text-yellow-500" />;
       default:
-        return <Clock className="h-5 w-5 text-gray-500" />
+        return <Clock className="h-5 w-5 text-gray-500" />;
     }
-  }
+  };
 
   const getStatusBadge = (status: string) => {
-    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-    
+    const baseClasses =
+      "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
+
     switch (status) {
-      case 'approved':
-        return `${baseClasses} bg-green-100 text-green-800`
-      case 'rejected':
-        return `${baseClasses} bg-red-100 text-red-800`
-      case 'under_review':
-        return `${baseClasses} bg-blue-100 text-blue-800`
-      case 'payment_pending':
-        return `${baseClasses} bg-yellow-100 text-yellow-800`
+      case "approved":
+        return `${baseClasses} bg-green-100 text-green-800`;
+      case "rejected":
+        return `${baseClasses} bg-red-100 text-red-800`;
+      case "under_review":
+        return `${baseClasses} bg-blue-100 text-blue-800`;
+      case "payment_pending":
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
       default:
-        return `${baseClasses} bg-gray-100 text-gray-800`
+        return `${baseClasses} bg-gray-100 text-gray-800`;
     }
-  }
+  };
+
+  const getPaymentStatusBadge = (paymentStatus: string) => {
+    const baseClasses =
+      "inline-flex items-center px-2 py-1 rounded text-xs font-medium";
+
+    switch (paymentStatus) {
+      case "paid":
+        return `${baseClasses} bg-green-100 text-green-700`;
+      case "pending":
+        return `${baseClasses} bg-yellow-100 text-yellow-700`;
+      case "failed":
+        return `${baseClasses} bg-red-100 text-red-700`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-700`;
+    }
+  };
+
+  const getPaymentStatusIcon = (paymentStatus: string) => {
+    switch (paymentStatus) {
+      case "paid":
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case "pending":
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case "failed":
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-500" />;
+    }
+  };
 
   return (
     <Layout title="Vendor Dashboard">
@@ -176,7 +257,10 @@ export default function VendorDashboard() {
                 Manage your vendor applications and track their status
               </p>
             </div>
-            <Link href="/vendor/apply" className="btn-primary flex items-center space-x-2">
+            <Link
+              href="/vendor/apply"
+              className="btn-primary flex items-center space-x-2"
+            >
               <Plus className="h-4 w-4" />
               <span>New Application</span>
             </Link>
@@ -189,10 +273,13 @@ export default function VendorDashboard() {
         {/* Applications Section */}
         <div className="card">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-medium text-gray-900">My Applications</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              My Applications
+            </h3>
             {applications && applications.length > 0 && (
               <span className="text-sm text-gray-500">
-                {applications.length} application{applications.length !== 1 ? 's' : ''}
+                {applications.length} application
+                {applications.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
@@ -204,7 +291,9 @@ export default function VendorDashboard() {
           ) : !applications || applications.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-4 text-sm font-medium text-gray-900">No applications yet</h3>
+              <h3 className="mt-4 text-sm font-medium text-gray-900">
+                No applications yet
+              </h3>
               <p className="mt-2 text-sm text-gray-500">
                 Get started by submitting your first vendor application.
               </p>
@@ -259,11 +348,13 @@ export default function VendorDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={getStatusBadge(application.status)}>
-                          {application.status.replace('_', ' ')}
+                          {application.status.replace("_", " ")}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(application.submitted_at).toLocaleDateString()}
+                        {new Date(
+                          application.submitted_at
+                        ).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Link
@@ -284,8 +375,10 @@ export default function VendorDashboard() {
 
         {/* Recent Payments Section */}
         <div className="card">
-          <h3 className="text-lg font-medium text-gray-900 mb-6">Recent Payments</h3>
-          
+          <h3 className="text-lg font-medium text-gray-900 mb-6">
+            Recent Payments
+          </h3>
+
           {paymentsLoading ? (
             <div className="flex justify-center py-4">
               <div className="spinner" />
@@ -297,7 +390,10 @@ export default function VendorDashboard() {
           ) : (
             <div className="space-y-4">
               {payments.slice(0, 5).map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div
+                  key={payment.id}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                >
                   <div className="flex items-center space-x-3">
                     <CreditCard className="h-5 w-5 text-gray-400" />
                     <div>
@@ -309,11 +405,15 @@ export default function VendorDashboard() {
                       </p>
                     </div>
                   </div>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    payment.status === 'success' ? 'bg-green-100 text-green-800' : 
-                    payment.status === 'failed' ? 'bg-red-100 text-red-800' : 
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      payment.status === "success"
+                        ? "bg-green-100 text-green-800"
+                        : payment.status === "failed"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
                     {payment.status}
                   </span>
                 </div>
@@ -323,5 +423,5 @@ export default function VendorDashboard() {
         </div>
       </div>
     </Layout>
-  )
+  );
 }

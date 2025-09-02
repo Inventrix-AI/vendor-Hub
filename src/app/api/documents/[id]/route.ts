@@ -13,7 +13,7 @@ function getUserFromToken(request: NextRequest): { id: number; email: string } |
       return null;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key') as any;
     return { id: decoded.userId || decoded.user_id, email: decoded.email };
   } catch (error) {
     console.error('Token verification failed:', error);

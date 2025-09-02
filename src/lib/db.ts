@@ -97,6 +97,25 @@ async function runMigrations() {
 
       console.log('Migration completed successfully');
     }
+
+    // Check if pending_registrations table exists
+    const pendingTableCheck = await pool.query(`
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name = 'pending_registrations'
+    `);
+
+    if (pendingTableCheck.rows.length === 0) {
+      console.log('Running migration: Adding pending_registrations table...');
+
+      // Read and execute pending registrations migration
+      const migrationPath = join(process.cwd(), 'database', 'migrations', 'add_pending_registrations_table.sql');
+      const migration = readFileSync(migrationPath, 'utf-8');
+
+      // Execute the migration
+      await pool.query(migration);
+
+      console.log('Pending registrations table migration completed successfully');
+    }
   } catch (error) {
     console.error('Error running migrations:', error);
   }
@@ -227,6 +246,16 @@ export const VendorApplicationDB = {
       [userId]
     );
     return result.rows;
+  },
+
+  findByVendorId: async (vendorId: string) => {
+    const result = await executeQuery(`
+      SELECT va.*, u.email as user_email, u.full_name as user_full_name, u.phone as user_phone
+      FROM vendor_applications va
+      JOIN users u ON va.user_id = u.id
+      WHERE va.vendor_id = $1
+    `, [vendorId]);
+    return result.rows[0] || null;
   },
 
   findAll: async (filters: { status?: string; search?: string; limit?: number } = {}) => {
@@ -508,6 +537,64 @@ export const VendorSubscriptionDB = {
       WHERE vendor_id = $2
       RETURNING *
     `, [status, vendorId]);
+    return result.rows[0];
+  }
+};
+
+// Pending Registration operations
+export const PendingRegistrationDB = {
+  create: async (pendingRegistration: {
+    razorpay_order_id: string;
+    application_id: string;
+    vendor_id: string;
+    registration_data: any;
+    expires_at: Date;
+  }) => {
+    const result = await executeQuery(`
+      INSERT INTO pending_registrations (razorpay_order_id, application_id, vendor_id, registration_data, expires_at)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [
+      pendingRegistration.razorpay_order_id,
+      pendingRegistration.application_id,
+      pendingRegistration.vendor_id,
+      JSON.stringify(pendingRegistration.registration_data),
+      pendingRegistration.expires_at
+    ]);
+    return result.rows[0];
+  },
+
+  findByOrderId: async (razorpayOrderId: string) => {
+    const result = await executeQuery(`
+      SELECT * FROM pending_registrations 
+      WHERE razorpay_order_id = $1 AND expires_at > CURRENT_TIMESTAMP
+    `, [razorpayOrderId]);
+    
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      return {
+        ...row,
+        registration_data: typeof row.registration_data === 'string' 
+          ? JSON.parse(row.registration_data) 
+          : row.registration_data
+      };
+    }
+    return null;
+  },
+
+  deleteByOrderId: async (razorpayOrderId: string) => {
+    const result = await executeQuery(`
+      DELETE FROM pending_registrations WHERE razorpay_order_id = $1
+      RETURNING *
+    `, [razorpayOrderId]);
+    return result.rows[0];
+  },
+
+  cleanupExpired: async () => {
+    const result = await executeQuery(`
+      DELETE FROM pending_registrations WHERE expires_at <= CURRENT_TIMESTAMP
+      RETURNING COUNT(*)
+    `);
     return result.rows[0];
   }
 };

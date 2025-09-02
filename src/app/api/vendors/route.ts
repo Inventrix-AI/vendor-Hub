@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IdGenerator } from '@/lib/vendorId';
-import { VendorApplicationDB, AuditLogDB, UserDB, DocumentDB } from '@/lib/database';
+import { VendorApplicationDB, AuditLogDB, UserDB, DocumentDB } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -112,7 +112,7 @@ function getUserFromToken(request: NextRequest): { id: number; email: string } |
       return null;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key') as any;
     return { id: decoded.userId || decoded.user_id, email: decoded.email };
   } catch (error) {
     console.error('Token verification failed:', error);
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
 
     if (applicationId) {
       // Get specific application
-      const application = VendorApplicationDB.findByApplicationId(applicationId);
+      const application = await VendorApplicationDB.findByApplicationId(applicationId);
       if (!application) {
         return NextResponse.json({ error: 'Application not found' }, { status: 404 });
       }
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get applications for the current user only
-    const applications = VendorApplicationDB.findByUserId(user.id);
+    const applications = await VendorApplicationDB.findByUserId(user.id);
     return NextResponse.json(applications);
   } catch (error) {
     console.error('Get applications error:', error);

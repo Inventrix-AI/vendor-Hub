@@ -24,7 +24,7 @@ export interface AuthToken {
   exp: number;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
 export class AuthService {
   static async hashPassword(password: string): Promise<string> {
