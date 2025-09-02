@@ -334,12 +334,13 @@ export const DocumentDB = {
     file_size: number;
     mime_type: string;
     uploaded_by: number;
+    storage_url?: string;
   }) => {
     const result = await executeQuery(`
       INSERT INTO documents (
         document_reference, application_id, document_type, file_name,
-        file_path, file_size, mime_type, uploaded_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        file_path, file_size, mime_type, uploaded_by, storage_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [
       document.document_reference,
@@ -349,7 +350,8 @@ export const DocumentDB = {
       document.file_path,
       document.file_size,
       document.mime_type,
-      document.uploaded_by
+      document.uploaded_by,
+      document.storage_url || null
     ]);
     return result.rows[0];
   },

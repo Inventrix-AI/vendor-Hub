@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IdGenerator } from '@/lib/vendorId';
 import { UserDB, VendorApplicationDB, DocumentDB, PaymentDB, AuditLogDB, executeQuery } from '@/lib/db';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import Razorpay from 'razorpay';
+import { SupabaseStorageService } from '@/lib/supabase-storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -150,11 +149,7 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create vendor application');
     }
 
-    // Create uploads directory
-    const uploadsDir = join(process.cwd(), 'uploads', applicationId);
-    await mkdir(uploadsDir, { recursive: true });
-
-    // Handle file uploads
+    // Handle file uploads to Supabase Storage
     const uploadedFiles = [];
     const filesToUpload = [
       { file: data.id_document, type: 'id_document', name: 'ID Document' },
@@ -169,23 +164,26 @@ export async function POST(request: NextRequest) {
           const fileExtension = item.file.name.split('.').pop();
           const documentReference = `DOC_${uuidv4().toUpperCase()}`;
           const fileName = `${documentReference}.${fileExtension}`;
-          const filePath = join(uploadsDir, fileName);
 
-          // Save file
-          const bytes = await item.file.arrayBuffer();
-          const buffer = Buffer.from(bytes);
-          await writeFile(filePath, buffer);
+          // Upload to Supabase Storage
+          const uploadResult = await SupabaseStorageService.uploadDocument(
+            applicationId,
+            item.type,
+            item.file,
+            fileName
+          );
 
           // Save document record
           await DocumentDB.create({
             document_reference: documentReference,
-            application_id: application.id,
+            application_id: (application as any).id,
             document_type: item.type,
             file_name: fileName,
-            file_path: `/uploads/${applicationId}/${fileName}`,
+            file_path: uploadResult.path,
             file_size: item.file.size,
             mime_type: item.file.type,
-            uploaded_by: user.id
+            uploaded_by: (user as any).id,
+            storage_url: uploadResult.publicUrl
           });
 
           uploadedFiles.push({

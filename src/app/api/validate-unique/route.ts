@@ -74,15 +74,34 @@ export async function POST(request: NextRequest) {
     console.error('Validation API error:', error);
     console.error('Error details:', {
       message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      code: error instanceof Error ? (error as any).code : undefined,
+      stack: error instanceof Error ? error.stack : undefined,
+      environment: process.env.NODE_ENV,
+      hasDBUrl: !!process.env.DATABASE_URL,
+      timestamp: new Date().toISOString()
     });
+    
+    // Provide more helpful error messages
+    let errorMessage = 'Internal server error';
+    if (error instanceof Error) {
+      if ((error as any).code === 'ENOTFOUND') {
+        errorMessage = 'Database connection failed - hostname not found';
+      } else if (error.message.includes('connect')) {
+        errorMessage = 'Database connection failed';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Database connection timeout';
+      }
+    }
     
     return NextResponse.json(
       { 
-        error: 'Internal server error',
+        error: errorMessage,
+        code: error instanceof Error ? (error as any).code : undefined,
         details: process.env.NODE_ENV === 'development' ? 
           (error instanceof Error ? error.message : 'Unknown error') : 
-          undefined
+          undefined,
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );
