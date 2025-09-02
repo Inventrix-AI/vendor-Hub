@@ -43,16 +43,16 @@ export async function GET(
     // Check if user has access to this document
     // For now, allow access to document owner only
     // In production, you'd also check for admin/reviewer access
-    if (document.uploaded_by !== user.id) {
+    if ((document as any).uploaded_by !== user.id) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Check if we have a storage_url (new Supabase Storage) or need to use file_path (legacy)
-    if (document.storage_url) {
+    if ((document as any).storage_url) {
       // For Supabase Storage, we can either redirect to the public URL or create a signed URL for security
       // Since we're doing access control, let's create a signed URL
       try {
-        const signedUrl = await SupabaseStorageService.getSignedUrl(document.file_path, 3600); // 1 hour expiry
+        const signedUrl = await SupabaseStorageService.getSignedUrl((document as any).file_path, 3600); // 1 hour expiry
         
         // Redirect to the signed URL
         return NextResponse.redirect(signedUrl);
@@ -62,29 +62,29 @@ export async function GET(
       }
     } else {
       // Legacy: Try to read from local file system (for backward compatibility)
-      const filePath = join(process.cwd(), 'uploads', document.file_path);
       try {
         const { readFile } = await import('fs/promises');
         const { join } = await import('path');
+        const filePath = join(process.cwd(), 'uploads', (document as any).file_path);
         const fileBuffer = await readFile(filePath);
         
         // Set appropriate headers
         const headers = new Headers();
-        headers.set('Content-Type', document.mime_type);
-        headers.set('Content-Length', document.file_size.toString());
+        headers.set('Content-Type', (document as any).mime_type);
+        headers.set('Content-Length', (document as any).file_size.toString());
         headers.set('Cache-Control', 'private, max-age=300'); // 5 minutes cache
         
         // For images, allow inline display; for PDFs, also inline; others as attachment
-        const isImage = document.mime_type.startsWith('image/');
-        const isPdf = document.mime_type === 'application/pdf';
+        const isImage = (document as any).mime_type.startsWith('image/');
+        const isPdf = (document as any).mime_type === 'application/pdf';
         
         if (isImage || isPdf) {
-          headers.set('Content-Disposition', `inline; filename="${document.file_name}"`);
+          headers.set('Content-Disposition', `inline; filename="${(document as any).file_name}"`);
         } else {
-          headers.set('Content-Disposition', `attachment; filename="${document.file_name}"`);
+          headers.set('Content-Disposition', `attachment; filename="${(document as any).file_name}"`);
         }
 
-        return new NextResponse(fileBuffer, { headers });
+        return new NextResponse(fileBuffer as any, { headers });
       } catch (fileError) {
         console.error('Error reading local file:', fileError);
         return NextResponse.json({ error: 'File not found' }, { status: 404 });

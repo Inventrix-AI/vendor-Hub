@@ -112,13 +112,13 @@ export async function POST(request: NextRequest) {
           
           // First try to find by email
           if (loginIdentifier.includes('@')) {
-            user = UserDB.findByEmail(loginIdentifier);
+            user = await UserDB.findByEmail(loginIdentifier);
           } else {
             // Try to find by vendor ID or application ID
             if (loginIdentifier.startsWith('PVS') || loginIdentifier.startsWith('APP')) {
-              const application = VendorApplicationDB.findByApplicationId(loginIdentifier);
+              const application = await VendorApplicationDB.findByApplicationId(loginIdentifier);
               if (application) {
-                user = UserDB.findById(application.user_id);
+                user = await UserDB.findById((application as any).user_id);
               }
             }
           }

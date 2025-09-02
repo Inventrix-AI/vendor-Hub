@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     if (search) filters.search = search;
     if (limit) filters.limit = parseInt(limit);
     
-    const applications = VendorApplicationDB.findAll(filters);
+    const applications = await VendorApplicationDB.findAll(filters);
     return NextResponse.json(applications);
   }
 
@@ -25,17 +25,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Application ID required' }, { status: 400 });
     }
     
-    const application = VendorApplicationDB.findByApplicationId(applicationId);
+    const application = await VendorApplicationDB.findByApplicationId(applicationId);
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 });
     }
     
-    // Get documents for this application
-    const documents = DocumentDB.findByApplicationId(application.id);
+    // Get documents for this application  
+    const documents = await DocumentDB.findByApplicationId((application as any).id);
     
     // Return application with documents
     const applicationWithDocs = {
-      ...application,
+      ...(application as any),
       documents
     };
     
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Default: dashboard stats
-  const stats = VendorApplicationDB.getStats();
+  const stats = await VendorApplicationDB.getStats();
   return NextResponse.json(stats);
 }
 
@@ -122,7 +122,10 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(updatedApplication);
+    // Update the application in the database
+    const result = await VendorApplicationDB.update(id, updatedApplication);
+    
+    return NextResponse.json(result || updatedApplication);
   } catch (error) {
     return NextResponse.json(
       { error: 'Internal server error' },

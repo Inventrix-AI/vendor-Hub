@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
 
     const applicationData = {
       application_id: applicationId,
-      user_id: user.id,
+      user_id: (user as any).id,
       vendor_id: vendorId,
       company_name,
       business_name: company_name,
-      contact_email: user.email,
+      contact_email: (user as any).email,
       phone: data.phone || '',
       business_type,
       business_description: '',
@@ -61,11 +61,11 @@ export async function POST(request: NextRequest) {
 
     // Log the action
     await AuditLogDB.create({
-      application_id: application.id,
-      user_id: user.id,
+      application_id: (application as any).id,
+      user_id: (user as any).id,
       action: 'Vendor Registration',
       entity_type: 'application',
-      entity_id: application.id,
+      entity_id: (application as any).id,
       new_values: {
         ...applicationData,
         vendor_id: vendorId,
@@ -77,10 +77,10 @@ export async function POST(request: NextRequest) {
       success: true,
       application_id: applicationId,
       vendor_id: vendorId,
-      email: user.email,
+      email: (user as any).email,
       temporary_password: temporaryPassword,
       status: 'pending',
-      submitted_at: application.created_at,
+      submitted_at: (application as any).created_at,
       message: 'Registration successful. Please use your Vendor ID and password to login.',
       instructions: {
         en: 'Your account has been created successfully. You can login with your Vendor ID and the provided password.',
@@ -139,14 +139,14 @@ export async function GET(request: NextRequest) {
       }
       
       // Check if user owns this application (for security)
-      if (application.user_id !== user.id) {
+      if ((application as any).user_id !== (user as any).id) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
       
       // Add documents to the application
-      const documents = DocumentDB.findByApplicationId(application.id);
+      const documents = await DocumentDB.findByApplicationId((application as any).id);
       const applicationWithDocs = {
-        ...application,
+        ...(application as any),
         documents
       };
       

@@ -39,12 +39,15 @@ export type ApplicationStatus =
 
 export interface Document {
   id: number
+  document_reference: string
   document_type: string
-  filename: string
+  file_name: string
   file_path: string
   file_size: number
   mime_type: string
   uploaded_at: string
+  created_at: string
+  storage_url?: string
 }
 
 export interface Payment {

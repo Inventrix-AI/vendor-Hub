@@ -17,7 +17,8 @@ import {
   Clock,
   XCircle,
   Upload,
-  DollarSign
+  DollarSign,
+  Eye
 } from 'lucide-react'
 import { VendorApplication } from '@/types'
 
