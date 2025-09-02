@@ -12,16 +12,31 @@ export function getDatabase(): Pool {
       throw new Error('DATABASE_URL environment variable is required');
     }
 
+    console.log('Initializing database connection...', {
+      hasUrl: !!databaseUrl,
+      environment: process.env.NODE_ENV,
+      urlHost: databaseUrl ? new URL(databaseUrl).hostname : 'N/A'
+    });
+
     pool = new Pool({
       connectionString: databaseUrl,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 10, // maximum number of connections in pool
-      idleTimeoutMillis: 30000, // close idle connections after 30 seconds
-      connectionTimeoutMillis: 10000, // return error after 10 seconds if connection could not be established
+      max: 5, // Reduce pool size for serverless
+      idleTimeoutMillis: 10000, // Reduce idle timeout for serverless
+      connectionTimeoutMillis: 15000, // Increase connection timeout
+      statement_timeout: 30000, // 30 second statement timeout
+      query_timeout: 30000, // 30 second query timeout
     });
 
-    // Initialize schema if needed
-    initializeSchema();
+    // Add error handler for the pool
+    pool.on('error', (err) => {
+      console.error('Unexpected database pool error:', err);
+    });
+
+    // Initialize schema if needed (but don't await it to avoid blocking)
+    initializeSchema().catch(err => {
+      console.error('Schema initialization failed:', err);
+    });
   }
 
   return pool;
@@ -73,8 +88,8 @@ async function runMigrations() {
     if (constraintCheck.rows.length === 0) {
       console.log('Running migration: Adding unique constraints for mobile and email...');
 
-      // Read and execute migration
-      const migrationPath = join(process.cwd(), 'database', 'migrations', 'add_unique_constraints.sql');
+      // Read and execute safe migration
+      const migrationPath = join(process.cwd(), 'database', 'migrations', 'add_unique_constraints_safe.sql');
       const migration = readFileSync(migrationPath, 'utf-8');
 
       // Execute the migration
@@ -87,15 +102,46 @@ async function runMigrations() {
   }
 }
 
-// Utility function for executing queries with error handling
-export async function executeQuery(text: string, params?: any[]) {
+// Utility function for executing queries with error handling and retry logic
+export async function executeQuery(text: string, params?: any[], retries: number = 2) {
   const db = getDatabase();
-  try {
-    const result = await db.query(text, params);
-    return result;
-  } catch (error) {
-    console.error('Database query error:', error);
-    throw error;
+  
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      console.log(`Query attempt ${attempt}:`, { query: text.substring(0, 100), params: params?.length });
+      const result = await db.query(text, params);
+      
+      if (attempt > 1) {
+        console.log(`Query succeeded on attempt ${attempt}`);
+      }
+      
+      return result;
+    } catch (error) {
+      const isLastAttempt = attempt === retries + 1;
+      const isConnectionError = error instanceof Error && (
+        (error as any).code === 'ENOTFOUND' ||
+        (error as any).code === 'ECONNREFUSED' ||
+        (error as any).code === 'ETIMEDOUT' ||
+        error.message.includes('connect') ||
+        error.message.includes('timeout')
+      );
+
+      console.error(`Database query error (attempt ${attempt}/${retries + 1}):`, {
+        error: error instanceof Error ? error.message : error,
+        code: error instanceof Error ? (error as any).code : undefined,
+        isConnectionError,
+        willRetry: !isLastAttempt && isConnectionError
+      });
+
+      if (isLastAttempt || !isConnectionError) {
+        throw error;
+      }
+
+      // Wait before retrying (exponential backoff)
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 }
 
