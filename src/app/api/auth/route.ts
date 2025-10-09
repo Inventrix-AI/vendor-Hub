@@ -20,6 +20,14 @@ const DEMO_USERS = [
     role: 'vendor',
     password_hash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // test123
     is_active: 1
+  },
+  {
+    id: 3,
+    email: 'anupam@lyzr.ai',
+    full_name: 'Anupam Parashar',
+    role: 'super_admin',
+    password_hash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // admin123
+    is_active: 1
   }
 ];
 
@@ -80,11 +88,11 @@ export async function POST(request: NextRequest) {
 
       try {
         let result: { user: any; token: string } | null;
-        
+
         if (isVercelEnvironment) {
           // Use hardcoded users for Vercel deployment
           const user = DEMO_USERS.find(u => u.email === loginIdentifier);
-          
+
           if (!user || !await bcrypt.compare(password, user.password_hash)) {
             return NextResponse.json(
               { error: 'Invalid credentials' },
@@ -94,10 +102,10 @@ export async function POST(request: NextRequest) {
 
           // Generate JWT token
           const token = jwt.sign(
-            { 
-              userId: user.id, 
-              email: user.email, 
-              role: user.role 
+            {
+              userId: user.id,
+              email: user.email,
+              role: user.role
             },
             process.env.JWT_SECRET || 'fallback-secret-key',
             { expiresIn: '24h' }
@@ -107,9 +115,9 @@ export async function POST(request: NextRequest) {
         } else {
           // Use database for local/production - support both email and vendor ID login
           const { UserDB, VendorApplicationDB } = await import('@/lib/db');
-          
+
           let user = null;
-          
+
           // First try to find by email
           if (loginIdentifier.includes('@')) {
             user = await UserDB.findByEmail(loginIdentifier);
@@ -122,7 +130,7 @@ export async function POST(request: NextRequest) {
               }
             }
           }
-          
+
           if (!user || !await bcrypt.compare(password, user.password_hash)) {
             return NextResponse.json(
               { error: 'Invalid credentials' },
@@ -132,10 +140,10 @@ export async function POST(request: NextRequest) {
 
           // Generate JWT token
           const token = jwt.sign(
-            { 
-              userId: user.id, 
-              email: user.email, 
-              role: user.role 
+            {
+              userId: user.id,
+              email: user.email,
+              role: user.role
             },
             process.env.JWT_SECRET || 'fallback-secret-key',
             { expiresIn: '24h' }
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
 
           result = { user, token };
         }
-        
+
         if (!result) {
           return NextResponse.json(
             { error: 'Invalid credentials' },
