@@ -109,10 +109,7 @@ export async function POST(request: NextRequest) {
       try {
         let result: { user: any; token: string } | null;
 
-        // Force hardcoded users for now to fix the issue
-        const useHardcodedUsers = true;
-
-        if (isVercelEnvironment || useHardcodedUsers) {
+        if (false) { // Disable hardcoded users, always use database
           // Use hardcoded users for Vercel deployment
           console.log('Using Vercel environment - hardcoded users');
           console.log('Looking for user:', loginIdentifier);
