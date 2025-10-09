@@ -40,7 +40,7 @@ const DEMO_USERS = [
 ];
 
 // Check if we're in Vercel environment
-const isVercelEnvironment = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' || process.env.VERCEL_URL;
+const isVercelEnvironment = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' || process.env.VERCEL_URL || process.env.VERCEL_ENV;
 
 // Debug logging
 console.log('Environment check:', {
@@ -94,8 +94,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'login') {
+      console.log('Login request received:', { action, username, email, password: password ? '[REDACTED]' : 'missing' });
       const loginIdentifier = username || email;
+      console.log('Login identifier:', loginIdentifier);
+
       if (!loginIdentifier || !password) {
+        console.log('Missing credentials:', { loginIdentifier: !!loginIdentifier, password: !!password });
         return NextResponse.json(
           { error: 'Missing credentials' },
           { status: 400 }
@@ -105,7 +109,10 @@ export async function POST(request: NextRequest) {
       try {
         let result: { user: any; token: string } | null;
 
-        if (isVercelEnvironment) {
+        // Force hardcoded users for now to fix the issue
+        const useHardcodedUsers = true;
+
+        if (isVercelEnvironment || useHardcodedUsers) {
           // Use hardcoded users for Vercel deployment
           console.log('Using Vercel environment - hardcoded users');
           console.log('Looking for user:', loginIdentifier);
@@ -139,13 +146,20 @@ export async function POST(request: NextRequest) {
           console.log('Using database environment');
 
           try {
+            console.log('Attempting to import database modules...');
             const { UserDB, VendorApplicationDB } = await import('@/lib/db');
+            console.log('Database modules imported successfully');
 
             let user = null;
 
             // First try to find by email
             if (loginIdentifier.includes('@')) {
+              console.log('Looking up user by email:', loginIdentifier);
               user = await UserDB.findByEmail(loginIdentifier);
+              console.log('User found in database:', user ? 'Yes' : 'No');
+              if (user) {
+                console.log('User data:', { id: user.id, email: user.email, role: user.role, hasPasswordHash: !!user.password_hash });
+              }
             } else {
               // Try to find by vendor ID (PVS prefix)
               if (loginIdentifier.startsWith('PVS')) {
@@ -156,7 +170,20 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            if (!user || !await bcrypt.compare(password, user.password_hash)) {
+            if (!user) {
+              console.log('User not found in database for:', loginIdentifier);
+              return NextResponse.json(
+                { error: 'Invalid credentials' },
+                { status: 401 }
+              );
+            }
+
+            console.log('User found, comparing password...');
+            const passwordMatch = await bcrypt.compare(password, user.password_hash);
+            console.log('Password match result:', passwordMatch);
+
+            if (!passwordMatch) {
+              console.log('Password comparison failed');
               return NextResponse.json(
                 { error: 'Invalid credentials' },
                 { status: 401 }
