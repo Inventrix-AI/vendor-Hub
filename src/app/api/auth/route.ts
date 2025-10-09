@@ -28,11 +28,27 @@ const DEMO_USERS = [
     role: 'super_admin',
     password_hash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // admin123
     is_active: 1
+  },
+  {
+    id: 4,
+    email: 'anupam@inventrix.ai',
+    full_name: 'Anupam Parashar',
+    role: 'super_admin',
+    password_hash: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // admin123
+    is_active: 1
   }
 ];
 
 // Check if we're in Vercel environment
-const isVercelEnvironment = process.env.VERCEL || process.env.NODE_ENV === 'production';
+const isVercelEnvironment = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' || process.env.VERCEL_URL;
+
+// Debug logging
+console.log('Environment check:', {
+  VERCEL: process.env.VERCEL,
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL_URL: process.env.VERCEL_URL,
+  isVercelEnvironment
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,9 +107,15 @@ export async function POST(request: NextRequest) {
 
         if (isVercelEnvironment) {
           // Use hardcoded users for Vercel deployment
+          console.log('Using Vercel environment - hardcoded users');
+          console.log('Looking for user:', loginIdentifier);
+          console.log('Available users:', DEMO_USERS.map(u => u.email));
+
           const user = DEMO_USERS.find(u => u.email === loginIdentifier);
+          console.log('Found user:', user);
 
           if (!user || !await bcrypt.compare(password, user.password_hash)) {
+            console.log('Authentication failed for:', loginIdentifier);
             return NextResponse.json(
               { error: 'Invalid credentials' },
               { status: 401 }
@@ -114,42 +136,71 @@ export async function POST(request: NextRequest) {
           result = { user, token };
         } else {
           // Use database for local/production - support both email and vendor ID login
-          const { UserDB, VendorApplicationDB } = await import('@/lib/db');
+          console.log('Using database environment');
 
-          let user = null;
+          try {
+            const { UserDB, VendorApplicationDB } = await import('@/lib/db');
 
-          // First try to find by email
-          if (loginIdentifier.includes('@')) {
-            user = await UserDB.findByEmail(loginIdentifier);
-          } else {
-            // Try to find by vendor ID (PVS prefix)
-            if (loginIdentifier.startsWith('PVS')) {
-              const application = await VendorApplicationDB.findByVendorId(loginIdentifier);
-              if (application) {
-                user = await UserDB.findById((application as any).user_id);
+            let user = null;
+
+            // First try to find by email
+            if (loginIdentifier.includes('@')) {
+              user = await UserDB.findByEmail(loginIdentifier);
+            } else {
+              // Try to find by vendor ID (PVS prefix)
+              if (loginIdentifier.startsWith('PVS')) {
+                const application = await VendorApplicationDB.findByVendorId(loginIdentifier);
+                if (application) {
+                  user = await UserDB.findById((application as any).user_id);
+                }
               }
             }
-          }
 
-          if (!user || !await bcrypt.compare(password, user.password_hash)) {
-            return NextResponse.json(
-              { error: 'Invalid credentials' },
-              { status: 401 }
+            if (!user || !await bcrypt.compare(password, user.password_hash)) {
+              return NextResponse.json(
+                { error: 'Invalid credentials' },
+                { status: 401 }
+              );
+            }
+
+            // Generate JWT token
+            const token = jwt.sign(
+              {
+                userId: user.id,
+                email: user.email,
+                role: user.role
+              },
+              process.env.JWT_SECRET || 'fallback-secret-key',
+              { expiresIn: '24h' }
             );
+
+            result = { user, token };
+          } catch (dbError) {
+            console.log('Database connection failed, falling back to hardcoded users:', dbError);
+
+            // Fallback to hardcoded users
+            const user = DEMO_USERS.find(u => u.email === loginIdentifier);
+
+            if (!user || !await bcrypt.compare(password, user.password_hash)) {
+              return NextResponse.json(
+                { error: 'Invalid credentials' },
+                { status: 401 }
+              );
+            }
+
+            // Generate JWT token
+            const token = jwt.sign(
+              {
+                userId: user.id,
+                email: user.email,
+                role: user.role
+              },
+              process.env.JWT_SECRET || 'fallback-secret-key',
+              { expiresIn: '24h' }
+            );
+
+            result = { user, token };
           }
-
-          // Generate JWT token
-          const token = jwt.sign(
-            {
-              userId: user.id,
-              email: user.email,
-              role: user.role
-            },
-            process.env.JWT_SECRET || 'fallback-secret-key',
-            { expiresIn: '24h' }
-          );
-
-          result = { user, token };
         }
 
         if (!result) {
