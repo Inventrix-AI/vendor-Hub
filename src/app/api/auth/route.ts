@@ -144,6 +144,8 @@ export async function POST(request: NextRequest) {
 
           try {
             console.log('Attempting to import database modules...');
+            console.log('DATABASE_URL available:', !!process.env.DATABASE_URL);
+            console.log('DATABASE_URL host:', process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : 'N/A');
             const { UserDB, VendorApplicationDB } = await import('@/lib/db');
             console.log('Database modules imported successfully');
 
@@ -200,7 +202,12 @@ export async function POST(request: NextRequest) {
 
             result = { user, token };
           } catch (dbError) {
-            console.log('Database connection failed, falling back to hardcoded users:', dbError);
+            console.log('Database connection failed:', dbError);
+            console.log('Error details:', {
+              message: dbError.message,
+              code: dbError.code,
+              stack: dbError.stack?.split('\n')[0]
+            });
 
             // Fallback to hardcoded users
             const user = DEMO_USERS.find(u => u.email === loginIdentifier);
