@@ -1,4 +1,4 @@
-import { DocumentDB, AuditLogDB } from './database';
+import { DocumentDB, AuditLogDB } from './db';
 import { IdGenerator } from './vendorId';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
@@ -69,7 +69,7 @@ export class DocumentVersionService {
     }
 
     // Save to database
-    const result = DocumentDB.create({
+    const result = await DocumentDB.create({
       document_reference: documentReference,
       application_id: parseInt(applicationId),
       document_type: documentType,
@@ -81,12 +81,12 @@ export class DocumentVersionService {
     });
 
     // Log the action
-    AuditLogDB.create({
+    await AuditLogDB.create({
       application_id: parseInt(applicationId),
       user_id: uploadedBy,
       action: `Document Uploaded - ${documentType} v${newVersion}`,
       entity_type: 'document',
-      entity_id: result.lastInsertRowid as number,
+      entity_id: result.id as number,
       new_values: {
         document_reference: documentReference,
         document_type: documentType,
@@ -96,7 +96,7 @@ export class DocumentVersionService {
     });
 
     return {
-      id: result.lastInsertRowid as number,
+      id: result.id as number,
       document_reference: documentReference,
       application_id: parseInt(applicationId),
       document_type: documentType,
@@ -121,22 +121,22 @@ export class DocumentVersionService {
 
   static async getDocumentHistory(applicationId: string, documentType?: string): Promise<DocumentVersion[]> {
     const applicationIdNum = parseInt(applicationId);
-    
+
     // Get all documents for this application
-    const allDocs = DocumentDB.findByApplicationId(applicationIdNum) as DocumentVersion[];
-    
+    const allDocs = await DocumentDB.findByApplicationId(applicationIdNum) as DocumentVersion[];
+
     if (documentType) {
       return allDocs.filter(doc => doc.document_type === documentType)
                    .sort((a, b) => b.version - a.version);
     }
-    
+
     return allDocs.sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
   }
 
   static async getCurrentDocuments(applicationId: string): Promise<DocumentVersion[]> {
     const applicationIdNum = parseInt(applicationId);
-    const allDocs = DocumentDB.findByApplicationId(applicationIdNum) as DocumentVersion[];
-    
+    const allDocs = await DocumentDB.findByApplicationId(applicationIdNum) as DocumentVersion[];
+
     return allDocs.filter(doc => doc.is_current);
   }
 
@@ -149,7 +149,7 @@ export class DocumentVersionService {
   static async deleteDocumentVersion(documentReference: string, deletedBy: number): Promise<void> {
     // This would soft-delete a document version
     // Log the deletion action
-    AuditLogDB.create({
+    await AuditLogDB.create({
       user_id: deletedBy,
       action: `Document Deleted - ${documentReference}`,
       entity_type: 'document',
@@ -159,7 +159,7 @@ export class DocumentVersionService {
 
   static async restoreDocumentVersion(documentReference: string, restoredBy: number): Promise<void> {
     // This would restore a deleted document version
-    AuditLogDB.create({
+    await AuditLogDB.create({
       user_id: restoredBy,
       action: `Document Restored - ${documentReference}`,
       entity_type: 'document',
