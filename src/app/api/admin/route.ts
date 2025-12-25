@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { VendorApplicationDB, DocumentDB } from '@/lib/database';
+import { VendorApplicationDB, DocumentDB } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

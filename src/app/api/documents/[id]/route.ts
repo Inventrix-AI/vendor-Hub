@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { DocumentDB } from '@/lib/database';
+import { DocumentDB } from '@/lib/db';
 import { SupabaseStorageService } from '@/lib/supabase-storage';
 import jwt from 'jsonwebtoken';
 

@@ -1,14 +1,39 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Initialize Supabase client with proper error handling
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables')
+// Validate environment variables
+function validateSupabaseConfig(): { url: string; key: string } {
+  if (!supabaseUrl || !supabaseKey) {
+    const missingVars = []
+    if (!supabaseUrl) missingVars.push('NEXT_PUBLIC_SUPABASE_URL')
+    if (!supabaseKey) missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+    console.error('❌ Missing Supabase configuration:', missingVars.join(', '))
+    console.error('📖 Please check .env.example for required environment variables')
+    console.error('🔗 Get your Supabase credentials from: https://app.supabase.com/project/_/settings/api')
+
+    throw new Error(
+      `Missing required Supabase environment variables: ${missingVars.join(', ')}. ` +
+      `Please add them to your .env file and restart the server.`
+    )
+  }
+
+  // Validate URL format
+  try {
+    new URL(supabaseUrl)
+  } catch (error) {
+    throw new Error(`Invalid NEXT_PUBLIC_SUPABASE_URL format: ${supabaseUrl}`)
+  }
+
+  return { url: supabaseUrl, key: supabaseKey }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+// Initialize Supabase client
+const config = validateSupabaseConfig()
+export const supabase = createClient(config.url, config.key)
 
 // Storage bucket name for documents
 export const DOCUMENTS_BUCKET = 'vendor-documents'

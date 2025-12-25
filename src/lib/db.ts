@@ -391,6 +391,14 @@ export const DocumentDB = {
       [applicationId]
     );
     return result.rows;
+  },
+
+  findById: async (id: number) => {
+    const result = await executeQuery(
+      'SELECT * FROM documents WHERE id = $1',
+      [id]
+    );
+    return result.rows[0] || null;
   }
 };
 

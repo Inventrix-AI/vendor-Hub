@@ -3,6 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { executeQuery } from '@/lib/db';
 import { SupabaseStorageService } from '@/lib/supabase-storage';
 
+// Vercel serverless function body size limit
+// Hobby/Pro: 4.5MB, Enterprise: 10MB
+const VERCEL_BODY_SIZE_LIMIT = 4.5 * 1024 * 1024; // 4.5MB
+
 // Document type definitions with specific requirements
 const DOCUMENT_TYPES = {
   'passport_photo': {
@@ -15,21 +19,21 @@ const DOCUMENT_TYPES = {
   'shop_address_proof': {
     name: 'Shop Address Proof',
     required: true,
-    maxSize: 5 * 1024 * 1024, // 5MB for documents
+    maxSize: 4 * 1024 * 1024, // 4MB for documents (adjusted for Vercel)
     allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
     description: 'Shop/business address verification document'
   },
   'id_card': {
     name: 'ID Card',
     required: true,
-    maxSize: 5 * 1024 * 1024, // 5MB for documents
+    maxSize: 4 * 1024 * 1024, // 4MB for documents (adjusted for Vercel)
     allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
     description: 'Aadhaar Card, Driving License, or Voter ID'
   },
   'business_license': {
     name: 'Business License',
     required: false,
-    maxSize: 5 * 1024 * 1024, // 5MB for documents
+    maxSize: 4 * 1024 * 1024, // 4MB for documents (adjusted for Vercel)
     allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
     description: 'Optional business registration or license document'
   }
