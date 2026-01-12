@@ -34,11 +34,23 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    const { documentId, reason } = data;
+    const { documentId, reason, status } = data;
 
-    if (!documentId || !reason) {
+    // For verification, reason is optional; for flagging, reason is required
+    if (!documentId) {
       return NextResponse.json(
-        { error: 'Missing documentId or reason' },
+        { error: 'Missing documentId' },
+        { status: 400 }
+      );
+    }
+
+    // If status is 'verified', we're verifying the document (no reason needed)
+    // Otherwise, we're flagging (reason required)
+    const isVerification = status === 'verified';
+
+    if (!isVerification && !reason) {
+      return NextResponse.json(
+        { error: 'Missing reason for flagging document' },
         { status: 400 }
       );
     }
@@ -49,29 +61,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 
-    // Flag the document
-    const updatedDocument = await DocumentDB.flagDocument(
-      parseInt(documentId),
-      reason,
-      user.id
-    );
+    let updatedDocument;
 
-    // Log the action
-    await AuditLogDB.create({
-      application_id: (document as any).application_id,
-      user_id: user.id,
-      action: `Document Flagged - ${(document as any).document_type}`,
-      entity_type: 'document',
-      entity_id: parseInt(documentId),
-      old_values: {
-        verification_status: (document as any).verification_status
-      },
-      new_values: {
-        verification_status: 'flagged',
-        flag_reason: reason,
-        flagged_by: user.email
-      }
-    });
+    if (isVerification) {
+      // Verify the document
+      updatedDocument = await DocumentDB.verifyDocument(
+        parseInt(documentId),
+        user.id
+      );
+
+      // Log the verification action
+      await AuditLogDB.create({
+        application_id: (document as any).application_id,
+        user_id: user.id,
+        action: `Document Verified - ${(document as any).document_type}`,
+        entity_type: 'document',
+        entity_id: parseInt(documentId),
+        old_values: {
+          verification_status: (document as any).verification_status
+        },
+        new_values: {
+          verification_status: 'verified',
+          verified_by: user.email
+        }
+      });
+    } else {
+      // Flag the document
+      updatedDocument = await DocumentDB.flagDocument(
+        parseInt(documentId),
+        reason,
+        user.id
+      );
+
+      // Log the flag action
+      await AuditLogDB.create({
+        application_id: (document as any).application_id,
+        user_id: user.id,
+        action: `Document Flagged - ${(document as any).document_type}`,
+        entity_type: 'document',
+        entity_id: parseInt(documentId),
+        old_values: {
+          verification_status: (document as any).verification_status
+        },
+        new_values: {
+          verification_status: 'flagged',
+          flag_reason: reason,
+          flagged_by: user.email
+        }
+      });
+    }
 
     return NextResponse.json({
       success: true,

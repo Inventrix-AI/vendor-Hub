@@ -155,13 +155,16 @@ export default function PersonalVerificationPage() {
           status: 'verified'
         })
       })
-      // Note: We're reusing the flag endpoint structure but for verification
-      // In a full implementation, you might want a separate endpoint
+      if (!response.ok) throw new Error('Failed to verify document')
+      return response.json()
     },
     {
       onSuccess: () => {
         toast.success('Document verified')
         queryClient.invalidateQueries(['admin-application-detail', applicationId])
+      },
+      onError: () => {
+        toast.error('Failed to verify document')
       }
     }
   )

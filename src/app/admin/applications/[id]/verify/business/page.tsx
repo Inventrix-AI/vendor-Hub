@@ -141,6 +141,32 @@ export default function BusinessVerificationPage() {
     }
   )
 
+  // Verify document mutation
+  const verifyDocMutation = useMutation(
+    async (documentId: number) => {
+      const response = await fetch('/api/admin/flag-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          documentId,
+          status: 'verified'
+        })
+      })
+      if (!response.ok) throw new Error('Failed to verify document')
+      return response.json()
+    },
+    {
+      onSuccess: () => {
+        toast.success('Document verified')
+        queryClient.invalidateQueries(['admin-application-detail', applicationId])
+      },
+      onError: () => {
+        toast.error('Failed to verify document')
+      }
+    }
+  )
+
   const handleFlagDocument = (docId: number) => {
     const doc = businessDocs.find(d => d.id === docId)
     if (doc) {
@@ -336,6 +362,7 @@ export default function BusinessVerificationPage() {
               onDocumentSelect={setSelectedDocType}
               onFlagDocument={handleFlagDocument}
               onRequestReupload={handleRequestReupload}
+              onVerifyDocument={(docId) => verifyDocMutation.mutate(docId)}
             />
           </div>
         </div>

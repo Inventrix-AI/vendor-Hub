@@ -560,6 +560,22 @@ export const DocumentDB = {
     return result.rows[0];
   },
 
+  verifyDocument: async (documentId: number, verifiedBy: number) => {
+    const result = await executeQuery(`
+      UPDATE documents
+      SET verification_status = 'verified',
+          verified_by = $1,
+          verified_at = CURRENT_TIMESTAMP,
+          flag_reason = NULL,
+          reupload_requested = false,
+          reupload_reason = NULL,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `, [verifiedBy, documentId]);
+    return result.rows[0];
+  },
+
   getDocumentsWithVerificationStatus: async (applicationId: number) => {
     const result = await executeQuery(`
       SELECT d.*, u.full_name as verified_by_name, u.email as verified_by_email

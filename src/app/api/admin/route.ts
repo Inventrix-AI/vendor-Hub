@@ -213,64 +213,81 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Fetch the application data if not provided
+    let appData = application_data;
+    if (!appData) {
+      const existingApp = await VendorApplicationDB.findByApplicationId(id);
+      if (!existingApp) {
+        return NextResponse.json(
+          { error: 'Application not found' },
+          { status: 404 }
+        );
+      }
+      appData = existingApp;
+    }
+
     let updatedApplication: any = {
-      id,
-      status,
-      updated_at: new Date().toISOString()
+      status
     };
 
     // If approved, generate vendor ID
-    if (status === 'approved' && application_data) {
+    if (status === 'approved') {
       const { IdGenerator } = await import('@/lib/vendorId');
       const vendorId = IdGenerator.vendorId(
-        application_data.company_name,
-        application_data.business_type
+        (appData as any).company_name || (appData as any).business_name || 'Vendor',
+        (appData as any).business_type || 'General'
       );
-      
+
       updatedApplication.vendor_id = vendorId;
 
       // Send approval notification
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'email',
-            recipient: application_data.contact_email,
-            templateId: 'application_approved',
-            applicationId: id,
-            data: {
-              vendorName: application_data.company_name,
+        const contactEmail = (appData as any).contact_email || (appData as any).user_email;
+        if (contactEmail) {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'email',
+              recipient: contactEmail,
+              templateId: 'application_approved',
               applicationId: id,
-              vendorId: vendorId
-            }
-          })
-        });
+              data: {
+                vendorName: (appData as any).company_name || (appData as any).business_name,
+                applicationId: id,
+                vendorId: vendorId
+              }
+            })
+          });
+        }
       } catch (notificationError) {
         console.error('Failed to send approval notification:', notificationError);
       }
     }
 
     // If rejected, send rejection notification
-    if (status === 'rejected' && application_data) {
+    if (status === 'rejected') {
       updatedApplication.rejection_reason = rejection_reason || 'Application requirements not met';
 
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'email',
-            recipient: application_data.contact_email,
-            templateId: 'application_rejected',
-            applicationId: id,
-            data: {
-              vendorName: application_data.company_name,
+        const contactEmail = (appData as any).contact_email || (appData as any).user_email;
+        if (contactEmail) {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'email',
+              recipient: contactEmail,
+              templateId: 'application_rejected',
               applicationId: id,
-              rejectionReason: updatedApplication.rejection_reason
-            }
-          })
-        });
+              data: {
+                vendorName: (appData as any).company_name || (appData as any).business_name,
+                applicationId: id,
+                rejectionReason: updatedApplication.rejection_reason
+              }
+            })
+          });
+        }
       } catch (notificationError) {
         console.error('Failed to send rejection notification:', notificationError);
       }
@@ -278,11 +295,12 @@ export async function PUT(request: NextRequest) {
 
     // Update the application in the database
     const result = await VendorApplicationDB.update(id, updatedApplication);
-    
-    return NextResponse.json(result || updatedApplication);
+
+    return NextResponse.json(result || { ...updatedApplication, application_id: id });
   } catch (error) {
+    console.error('Admin PUT error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
