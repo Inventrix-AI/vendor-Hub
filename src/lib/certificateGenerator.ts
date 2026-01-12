@@ -92,15 +92,15 @@ export class CertificateGenerator {
 
     // Organization name
     this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(16);
+    this.doc.setFontSize(18);
     this.doc.setTextColor(0, 51, 102);
-    this.doc.text('PATHARI VISTHAPIT EVAM SAHAYATA MANCH PARIVAR', centerX, 30, { align: 'center' });
+    this.doc.text('PATH VIKRETA EKTA SANGH', centerX, 30, { align: 'center' });
 
     // Subtitle
     this.doc.setFont('helvetica', 'normal');
     this.doc.setFontSize(12);
     this.doc.setTextColor(51, 51, 51);
-    this.doc.text('Street Vendors Association', centerX, 38, { align: 'center' });
+    this.doc.text('Madhya Pradesh', centerX, 38, { align: 'center' });
 
     // Decorative line
     this.doc.setDrawColor(0, 51, 102);
@@ -237,7 +237,7 @@ export class CertificateGenerator {
     this.doc.setFontSize(11);
     this.doc.setTextColor(51, 51, 51);
 
-    const statement = 'is a registered member of the Street Vendors Association and is authorized to conduct business as per the terms and conditions of registration.';
+    const statement = 'is a registered member of Path Vikreta Ekta Sangh, Madhya Pradesh and is authorized to conduct business as per the terms and conditions of registration.';
     const splitStatement = this.doc.splitTextToSize(statement, this.contentWidth - 30);
     this.doc.text(splitStatement, leftMargin, yPos);
   }
