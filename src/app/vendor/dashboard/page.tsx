@@ -17,7 +17,10 @@ import {
   Calendar,
   AlertTriangle,
   RefreshCw,
+  Award,
+  Download,
 } from "lucide-react";
+import { CertificateDownloadButton } from "@/components/CertificateDownloadButton";
 import { VendorApplication, Payment } from "@/types";
 
 // Subscription status component
@@ -269,6 +272,34 @@ export default function VendorDashboard() {
 
         {/* Subscription Status - Only show if vendor has an approved application */}
         {vendorId && <SubscriptionStatusCard vendorId={vendorId} />}
+
+        {/* Certificate Download - Only show if vendor has an approved application */}
+        {approvedApplication && (
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <Award className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Vendor Registration Certificate
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Download your official registration certificate
+                  </p>
+                </div>
+              </div>
+              <CertificateDownloadButton
+                applicationId={approvedApplication.application_id}
+                vendorId={approvedApplication.vendor_id}
+                status={approvedApplication.status}
+                variant="primary"
+                size="lg"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Applications Section */}
         <div className="card">

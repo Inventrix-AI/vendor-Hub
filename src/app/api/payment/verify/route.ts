@@ -59,6 +59,24 @@ export async function POST(request: NextRequest) {
     
     const registrationData = pendingRegistration.registration_data;
 
+    // DEBUG: Log the entire files object structure
+    console.log('[Payment Verify] DEBUG - Files in registration data:');
+    console.log('[Payment Verify] Files object exists:', !!registrationData.files);
+    if (registrationData.files) {
+      console.log('[Payment Verify] Files object keys:', Object.keys(registrationData.files));
+      Object.entries(registrationData.files).forEach(([key, value]: [string, any]) => {
+        console.log(`[Payment Verify] ${key}:`, {
+          exists: !!value,
+          has_data: !!(value && value.data),
+          name: value?.name,
+          type: value?.type,
+          size: value?.size,
+          data_length: value?.data?.length || 0,
+          data_preview: value?.data?.substring(0, 50) || 'N/A'
+        });
+      });
+    }
+
     console.log('Creating user account after successful payment verification...');
 
     // Create user account
@@ -87,31 +105,61 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle file uploads to Supabase Storage
+    // Files are stored as base64 encoded objects: { name, type, size, data }
+    // Use specific document types for better identification in verification page
     const uploadedFiles = [];
     const filesToUpload = [
-      { file: registrationData.files.id_document, type: 'id_document', name: 'ID Document' },
-      { file: registrationData.files.photo, type: 'photo', name: 'Photo' },
-      { file: registrationData.files.shop_document, type: 'shop_document', name: 'Shop Document' },
+      {
+        file: registrationData.files.id_document,
+        type: registrationData.files.id_document_type || 'aadhaar_card',  // Use specific ID type
+        name: 'ID Document'
+      },
+      { file: registrationData.files.photo, type: 'passport_photo', name: 'Photo' },
+      {
+        file: registrationData.files.shop_document,
+        type: registrationData.files.shop_document_type || 'shop_document',  // Use specific shop doc type
+        name: 'Shop Document'
+      },
       { file: registrationData.files.shop_photo, type: 'shop_photo', name: 'Shop Photo' }
     ];
 
+    console.log('[Payment Verify] Starting file uploads...');
+    console.log('[Payment Verify] filesToUpload count:', filesToUpload.length);
+
     for (const item of filesToUpload) {
-      if (item.file && item.file.size > 0) {
+      console.log(`[Payment Verify] Processing ${item.name}:`, {
+        file_exists: !!item.file,
+        has_data: !!(item.file && item.file.data),
+        size: item.file?.size || 0,
+        data_length: item.file?.data?.length || 0
+      });
+
+      // Check if file exists and has data (base64 encoded format)
+      if (item.file && item.file.data && item.file.size > 0) {
         try {
           const fileExtension = item.file.name.split('.').pop();
           const documentReference = `DOC_${uuidv4().toUpperCase()}`;
           const fileName = `${documentReference}.${fileExtension}`;
 
-          // Upload to Supabase Storage
-          const uploadResult = await SupabaseStorageService.uploadDocument(
+          console.log(`[Payment Verify] Converting base64 to buffer for ${item.name}...`);
+          // Convert base64 back to Buffer for upload
+          const fileBuffer = Buffer.from(item.file.data, 'base64');
+          console.log(`[Payment Verify] Buffer size: ${fileBuffer.length} bytes`);
+
+          console.log(`[Payment Verify] Uploading ${item.name} to Supabase Storage...`);
+          // Upload to Supabase Storage using buffer
+          const uploadResult = await SupabaseStorageService.uploadDocumentBuffer(
             registrationData.applicationData.application_id,
             item.type,
-            item.file,
-            fileName
+            fileBuffer,
+            fileName,
+            item.file.type
           );
+          console.log(`[Payment Verify] Supabase upload success:`, uploadResult);
 
+          console.log(`[Payment Verify] Saving document record to database...`);
           // Save document record
-          await DocumentDB.create({
+          const docRecord = await DocumentDB.create({
             document_reference: documentReference,
             application_id: (application as any).id,
             document_type: item.type,
@@ -122,6 +170,7 @@ export async function POST(request: NextRequest) {
             uploaded_by: (user as any).id,
             storage_url: uploadResult.publicUrl
           });
+          console.log(`[Payment Verify] Document record created:`, docRecord);
 
           uploadedFiles.push({
             type: item.type,
@@ -129,10 +178,34 @@ export async function POST(request: NextRequest) {
             filename: fileName,
             reference: documentReference
           });
+
+          console.log(`[Payment Verify] Successfully uploaded ${item.name}: ${fileName}`);
         } catch (error) {
-          console.error(`Failed to upload ${item.name}:`, error);
+          console.error(`[Payment Verify] Failed to upload ${item.name}:`, error);
+          console.error(`[Payment Verify] Error details:`, {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          });
         }
+      } else {
+        console.log(`[Payment Verify] Skipping ${item.name}: No file data available`, {
+          file_exists: !!item.file,
+          file_data_exists: !!(item.file && item.file.data),
+          file_size: item.file?.size || 0
+        });
       }
+    }
+
+    console.log(`[Payment Verify] File upload complete. Total uploaded: ${uploadedFiles.length}`);
+    console.log('[Payment Verify] Uploaded files:', uploadedFiles);
+
+    // Track which files were skipped
+    const skippedFiles = filesToUpload
+      .filter(item => !item.file || !item.file.data || item.file.size === 0)
+      .map(item => item.name);
+
+    if (skippedFiles.length > 0) {
+      console.warn(`[Payment Verify] WARNING: ${skippedFiles.length} files were skipped:`, skippedFiles);
     }
 
     // Create payment record
@@ -203,7 +276,13 @@ export async function POST(request: NextRequest) {
       email: registrationData.userData.email,
       temporaryPassword: registrationData.userData.temporaryPassword,
       status: 'under_review',
-      uploaded_files: uploadedFiles
+      uploaded_files: uploadedFiles,
+      skipped_files: skippedFiles,
+      file_upload_summary: {
+        total_expected: filesToUpload.length,
+        successfully_uploaded: uploadedFiles.length,
+        skipped: skippedFiles.length
+      }
     });
 
   } catch (error) {

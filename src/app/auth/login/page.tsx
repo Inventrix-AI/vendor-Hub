@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -11,7 +12,6 @@ import {
   Eye,
   EyeOff,
   LogIn,
-  Building,
   UserCheck,
   ArrowRight,
   User,
@@ -97,10 +97,14 @@ export default function LoginPage() {
       <div className="bg-white shadow-sm border-b">
         <div className="container-fluid">
           <div className="flex items-center justify-between h-16 px-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                <Building className="w-6 h-6 text-white" />
-              </div>
+            <Link href="/" className="flex items-center space-x-3">
+              <Image
+                src="/Path Vikreta.png"
+                alt="Path Vikreta Ekta Sangh Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 object-contain"
+              />
               <div>
                 <h1 className="text-lg font-bold text-blue-600">
                   {language === "hi"
@@ -111,7 +115,7 @@ export default function LoginPage() {
                   {language === "hi" ? "विक्रेता लॉगिन" : "Vendor Login"}
                 </p>
               </div>
-            </div>
+            </Link>
 
             <LanguageSwitcher />
           </div>

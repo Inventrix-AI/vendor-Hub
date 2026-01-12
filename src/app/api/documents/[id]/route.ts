@@ -3,18 +3,18 @@ import { DocumentDB } from '@/lib/db';
 import { SupabaseStorageService } from '@/lib/supabase-storage';
 import jwt from 'jsonwebtoken';
 
-function getUserFromToken(request: NextRequest): { id: number; email: string } | null {
+function getUserFromToken(request: NextRequest): { id: number; email: string; role: string } | null {
   try {
     const authHeader = request.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '') || 
+    const token = authHeader?.replace('Bearer ', '') ||
                   request.cookies.get('access_token')?.value;
-    
+
     if (!token) {
       return null;
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key') as any;
-    return { id: decoded.userId || decoded.user_id, email: decoded.email };
+    return { id: decoded.userId || decoded.user_id, email: decoded.email, role: decoded.role };
   } catch (error) {
     console.error('Token verification failed:', error);
     return null;
@@ -41,9 +41,11 @@ export async function GET(
     }
 
     // Check if user has access to this document
-    // For now, allow access to document owner only
-    // In production, you'd also check for admin/reviewer access
-    if ((document as any).uploaded_by !== user.id) {
+    // Allow access to document owner OR admins/super_admins
+    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    const isOwner = (document as any).uploaded_by === user.id;
+
+    if (!isAdmin && !isOwner) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 

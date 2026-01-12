@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link'
-import { 
-  Building2, 
-  Shield, 
-  CreditCard, 
-  FileCheck, 
-  ArrowRight, 
-  CheckCircle, 
+import Image from 'next/image'
+import {
+  Shield,
+  CreditCard,
+  FileCheck,
+  ArrowRight,
+  CheckCircle,
   Zap,
   Users,
   TrendingUp,
@@ -18,7 +18,8 @@ import {
   Upload,
   User,
   Building,
-  IndianRupee
+  IndianRupee,
+  UserCircle
 } from 'lucide-react'
 import { useLanguage } from '@/lib/language'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -34,10 +35,14 @@ export default function Home() {
       <nav className="bg-white shadow-md border-b border-neutral-200 sticky top-0 z-50">
         <div className="container-fluid">
           <div className="flex items-center justify-between h-16 px-4 sm:px-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gov-blue rounded-full flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-white" />
-              </div>
+            <Link href="/" className="flex items-center space-x-3">
+              <Image
+                src="/Path Vikreta.png"
+                alt="Path Vikreta Ekta Sangh Logo"
+                width={48}
+                height={48}
+                className="w-12 h-12 object-contain"
+              />
               <div className="flex flex-col">
                 <span className="text-lg font-bold text-gov-blue leading-tight">
                   {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
@@ -46,7 +51,7 @@ export default function Home() {
                   {language === 'hi' ? 'मध्यप्रदेश' : 'Madhya Pradesh'}
                 </span>
               </div>
-            </div>
+            </Link>
             
             <div className="flex items-center space-x-2">
               <LanguageSwitcher />
@@ -71,7 +76,7 @@ export default function Home() {
         <div className="container-fluid">
           <div className="text-center mb-12">
             <div className="inline-flex items-center px-4 py-2 bg-gov-coral text-white rounded-full text-sm font-medium mb-6">
-              <Building2 className="w-4 h-4 mr-2" />
+              <Building className="w-4 h-4 mr-2" />
               {t('hero.badge')}
             </div>
             
@@ -120,7 +125,7 @@ export default function Home() {
               {/* Left Content */}
               <div className="space-y-6">
                 <div className="inline-flex items-center px-4 py-2 bg-blue-100 text-gov-blue rounded-full text-sm font-medium">
-                  <Building2 className="w-4 h-4 mr-2" />
+                  <Building className="w-4 h-4 mr-2" />
                   {language === 'hi' ? 'संगठन परिचय' : 'About Organization'}
                 </div>
                 <h2 className="text-3xl md:text-4xl font-bold text-gov-blue leading-tight">
@@ -153,7 +158,7 @@ export default function Home() {
                 <div className="bg-gradient-to-br from-gov-blue to-gov-coral rounded-2xl p-8 text-white">
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center">
-                      <Building2 className="w-20 h-20 mx-auto mb-4 opacity-80" />
+                      <Building className="w-20 h-20 mx-auto mb-4 opacity-80" />
                       <h3 className="text-xl font-bold mb-2">
                         {language === 'hi' ? 'एक मजबूत संगठन' : 'A Strong Organization'}
                       </h3>
@@ -578,80 +583,99 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer id="contact" className="bg-gray-900 text-white py-12">
-        <div className="container-fluid">
-          <div className="grid md:grid-cols-3 gap-8 mb-8">
-            <div>
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-12 h-12 bg-gov-coral rounded-full flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
+      <footer id="contact" className="bg-gov-blue text-white">
+        <div className="container-fluid py-8 px-4 sm:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Organization Info */}
+            <div className="flex flex-col items-center md:items-start">
+              <div className="flex items-center space-x-3 mb-4">
+                <Image
+                  src="/Path Vikreta.png"
+                  alt="Path Vikreta Ekta Sangh Logo"
+                  width={56}
+                  height={56}
+                  className="w-14 h-14 object-contain bg-white rounded-lg p-1"
+                />
                 <div>
-                  <h3 className="text-lg font-bold">
+                  <h3 className="font-bold text-lg">
                     {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
                   </h3>
-                  <p className="text-sm opacity-80">
+                  <p className="text-blue-200 text-sm">
                     {language === 'hi' ? 'मध्यप्रदेश' : 'Madhya Pradesh'}
                   </p>
                 </div>
               </div>
-              <p className="text-sm opacity-90 leading-relaxed">
-                {language === 'hi' 
+              <p className="text-sm text-blue-100 leading-relaxed">
+                {language === 'hi'
                   ? 'खुदरा विक्रेताओं के लिए एकता, सहयोग और विकास का मंच'
                   : 'A platform for unity, cooperation and development for retail vendors'}
               </p>
             </div>
-            
-            <div>
+
+            {/* Contact Details */}
+            <div className="flex flex-col items-center md:items-start">
               <h4 className="font-semibold text-lg mb-4">
-                {language === 'hi' ? 'संपर्क जानकारी' : 'Contact Information'}
+                {language === 'hi' ? 'संपर्क करें' : 'Contact Us'}
               </h4>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-blue-100">
                 <div className="flex items-center space-x-2">
-                  <Phone className="w-4 h-4" />
-                  <span>+91 12345 67890</span>
+                  <UserCircle className="w-5 h-5 text-blue-200" />
+                  <span>{language === 'hi' ? 'अनुज शाक्यवार' : 'Anuj Shakyawar'}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Mail className="w-4 h-4" />
-                  <span>info@pathvikretasangh.org</span>
+                  <Phone className="w-5 h-5 text-blue-200" />
+                  <a href="tel:+917000619985" className="hover:text-white transition-colors">
+                    +91 70006 19985
+                  </a>
                 </div>
                 <div className="flex items-start space-x-2">
-                  <MapPin className="w-4 h-4 mt-1" />
-                  <span>
-                    {language === 'hi' 
-                      ? 'मध्यप्रदेश, भारत' 
-                      : 'Madhya Pradesh, India'}
+                  <MapPin className="w-5 h-5 text-blue-200 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">
+                    {language === 'hi'
+                      ? 'एल जी 34 भरत आर्केड कोलार रोड़ भोपाल'
+                      : 'LG 34 Bharat Arcade, Kolar Road, Bhopal'}
                   </span>
                 </div>
               </div>
             </div>
-            
-            <div>
+
+            {/* Important Links */}
+            <div className="flex flex-col items-center md:items-start">
               <h4 className="font-semibold text-lg mb-4">
                 {language === 'hi' ? 'महत्वपूर्ण लिंक' : 'Important Links'}
               </h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#benefits" className="hover:text-gov-coral transition-colors">
+              <ul className="space-y-2 text-sm text-blue-100">
+                <li><a href="#benefits" className="hover:text-white transition-colors">
                   {language === 'hi' ? 'संगठन के लाभ' : 'Organization Benefits'}
                 </a></li>
-                <li><a href="#membership" className="hover:text-gov-coral transition-colors">
+                <li><a href="#membership" className="hover:text-white transition-colors">
                   {language === 'hi' ? 'सदस्यता' : 'Membership'}
                 </a></li>
-                <li><a href="#membership-form" className="hover:text-gov-coral transition-colors">
+                <li><a href="/vendor/register" className="hover:text-white transition-colors">
                   {language === 'hi' ? 'आवेदन फार्म' : 'Application Form'}
                 </a></li>
-                <li><a href="/admin/dashboard" className="hover:text-gov-coral transition-colors">
-                  {language === 'hi' ? 'एडमिन डैशबोर्ड' : 'Admin Dashboard'}
+                <li><a href="/auth/login" className="hover:text-white transition-colors">
+                  {language === 'hi' ? 'लॉगिन' : 'Login'}
                 </a></li>
               </ul>
             </div>
+
+            {/* FRAI Certification */}
+            <div className="flex flex-col items-center md:items-end">
+              <Image
+                src="/FRAI.png"
+                alt="FRAI Certification"
+                width={120}
+                height={120}
+                className="w-28 h-28 object-contain bg-white rounded-lg p-2"
+              />
+            </div>
           </div>
-          
-          <div className="border-t border-blue-800 pt-6 text-center">
-            <div className="gov-header mb-4"></div>
-            <p className="text-sm opacity-90">
-              &copy; 2024 {language === 'hi' ? 'पथ विक्रेता एकता संघ मध्यप्रदेश' : 'Path Vikreta Ekta Sangh Madhya Pradesh'}. 
-              {language === 'hi' ? 'सभी अधिकार सुरक्षित' : 'All rights reserved'}.
+
+          {/* Copyright */}
+          <div className="border-t border-blue-400/30 mt-8 pt-6 text-center text-blue-200 text-sm">
+            <p>
+              © {new Date().getFullYear()} {language === 'hi' ? 'पथ विक्रेता एकता संघ। सर्वाधिकार सुरक्षित।' : 'Path Vikreta Ekta Sangh. All rights reserved.'}
             </p>
           </div>
         </div>

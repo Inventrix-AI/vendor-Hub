@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -14,7 +16,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Upload,
-  MapPin,
   Check,
   Globe,
   Copy,
@@ -25,6 +26,7 @@ import {
 import { useLanguage } from "@/lib/language";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { usePincodeData } from "@/lib/pincodeService";
+import { processFiles } from "@/lib/imageCompression";
 
 // Razorpay types
 declare global {
@@ -107,9 +109,10 @@ const businessTypes = [
 ];
 
 const idTypes = [
-  { hi: "आधार कार्ड", en: "Aadhaar Card", value: "aadhaar" },
+  { hi: "आधार कार्ड", en: "Aadhaar Card", value: "aadhaar_card" },
   { hi: "वोटर कार्ड", en: "Voter ID Card", value: "voter_id" },
   { hi: "ड्राइविंग लाइसेंस", en: "Driving License", value: "driving_license" },
+  { hi: "पैन कार्ड", en: "PAN Card", value: "pan_card" },
 ];
 
 const shopDocumentTypes = [
@@ -555,17 +558,88 @@ export default function VendorRegisterPage() {
     try {
       setLoading(true);
 
+      // Show processing toast
+      toast.info(
+        language === "hi"
+          ? "फ़ाइलें प्रोसेस हो रही हैं..."
+          : "Processing files...",
+        { autoClose: 2000 }
+      );
+
+      // Process files: compress images, validate PDFs
+      const processedFiles = await processFiles({
+        id_document: data.id_document,
+        photo: data.photo,
+        shop_document: data.shop_document,
+        shop_photo: data.shop_photo,
+      });
+
+      // Check for file validation errors (e.g., PDF too large)
+      if (processedFiles.errors.length > 0) {
+        setLoading(false);
+        processedFiles.errors.forEach((error) => {
+          toast.error(error);
+        });
+        return;
+      }
+
+      // Log compression stats and processed files
+      const { stats } = processedFiles;
+      console.log(`[Upload] Original total: ${(stats.originalTotal / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`[Upload] Final total: ${(stats.finalTotal / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`[Upload] Saved: ${stats.savedPercent}% (${(stats.savedBytes / 1024).toFixed(0)}KB)`);
+
+      // Debug: Log each processed file
+      console.log('[Upload] Processed files:', {
+        id_document: processedFiles.id_document ? {
+          name: processedFiles.id_document.name,
+          size: processedFiles.id_document.size,
+          type: processedFiles.id_document.type
+        } : null,
+        photo: processedFiles.photo ? {
+          name: processedFiles.photo.name,
+          size: processedFiles.photo.size,
+          type: processedFiles.photo.type
+        } : null,
+        shop_document: processedFiles.shop_document ? {
+          name: processedFiles.shop_document.name,
+          size: processedFiles.shop_document.size,
+          type: processedFiles.shop_document.type
+        } : null,
+        shop_photo: processedFiles.shop_photo ? {
+          name: processedFiles.shop_photo.name,
+          size: processedFiles.shop_photo.size,
+          type: processedFiles.shop_photo.type
+        } : null
+      });
+
       // Create FormData for file uploads
       const formData = new FormData();
 
       // Add all form fields to FormData
       Object.entries(data).forEach(([key, value]) => {
-        if (value instanceof File) {
-          formData.append(key, value);
-        } else if (value !== null && value !== undefined) {
+        // Skip file fields - we'll add processed versions
+        if (key === 'id_document' || key === 'photo' || key === 'shop_document' || key === 'shop_photo') {
+          return;
+        }
+        if (value !== null && value !== undefined) {
           formData.append(key, String(value));
         }
       });
+
+      // Add processed files (compressed images or validated PDFs)
+      if (processedFiles.id_document) {
+        formData.append('id_document', processedFiles.id_document);
+      }
+      if (processedFiles.photo) {
+        formData.append('photo', processedFiles.photo);
+      }
+      if (processedFiles.shop_document) {
+        formData.append('shop_document', processedFiles.shop_document);
+      }
+      if (processedFiles.shop_photo) {
+        formData.append('shop_photo', processedFiles.shop_photo);
+      }
 
       // Submit to backend API
       const response = await fetch("/api/vendor-register", {
@@ -778,10 +852,14 @@ export default function VendorRegisterPage() {
       <div className="bg-white shadow-sm border-b">
         <div className="container-fluid">
           <div className="flex items-center justify-between h-16 px-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gov-blue rounded-full flex items-center justify-center">
-                <Building className="w-6 h-6 text-white" />
-              </div>
+            <Link href="/" className="flex items-center space-x-3">
+              <Image
+                src="/Path Vikreta.png"
+                alt="Path Vikreta Ekta Sangh Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 object-contain"
+              />
               <div>
                 <h1 className="text-lg font-bold text-gov-blue">
                   {language === "hi"
@@ -794,7 +872,7 @@ export default function VendorRegisterPage() {
                     : "Membership Registration"}
                 </p>
               </div>
-            </div>
+            </Link>
 
             <LanguageSwitcher />
           </div>

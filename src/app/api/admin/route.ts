@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { VendorApplicationDB, DocumentDB } from '@/lib/db';
+import { VendorApplicationDB, DocumentDB, executeQuery } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -19,26 +19,180 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(applications);
   }
 
+  // Debug endpoint to check pending_registrations table
+  if (type === 'debug-pending-registrations') {
+    try {
+      const pendingRegs = await executeQuery(`
+        SELECT
+          id,
+          razorpay_order_id,
+          application_id,
+          vendor_id,
+          created_at,
+          expires_at,
+          registration_data->'files' as files_info
+        FROM pending_registrations
+        ORDER BY created_at DESC
+        LIMIT 10
+      `);
+
+      // Check file data structure for each registration
+      const regDetails = pendingRegs.rows.map((reg: any) => {
+        const filesInfo = reg.files_info || {};
+        return {
+          ...reg,
+          files_analysis: {
+            id_document: filesInfo.id_document ? {
+              has_data: !!filesInfo.id_document.data,
+              name: filesInfo.id_document.name,
+              size: filesInfo.id_document.size,
+              type: filesInfo.id_document.type,
+              data_length: filesInfo.id_document.data?.length || 0
+            } : null,
+            photo: filesInfo.photo ? {
+              has_data: !!filesInfo.photo.data,
+              name: filesInfo.photo.name,
+              size: filesInfo.photo.size,
+              type: filesInfo.photo.type,
+              data_length: filesInfo.photo.data?.length || 0
+            } : null,
+            shop_document: filesInfo.shop_document ? {
+              has_data: !!filesInfo.shop_document.data,
+              name: filesInfo.shop_document.name,
+              size: filesInfo.shop_document.size,
+              type: filesInfo.shop_document.type,
+              data_length: filesInfo.shop_document.data?.length || 0
+            } : null,
+            shop_photo: filesInfo.shop_photo ? {
+              has_data: !!filesInfo.shop_photo.data,
+              name: filesInfo.shop_photo.name,
+              size: filesInfo.shop_photo.size,
+              type: filesInfo.shop_photo.type,
+              data_length: filesInfo.shop_photo.data?.length || 0
+            } : null
+          }
+        };
+      });
+
+      return NextResponse.json({
+        count: pendingRegs.rows.length,
+        registrations: regDetails,
+        message: 'Pending registrations (last 10)'
+      });
+    } catch (error) {
+      console.error('[Debug Pending Registrations] Error:', error);
+      return NextResponse.json({ error: 'Debug query failed', details: String(error) }, { status: 500 });
+    }
+  }
+
+  // Debug endpoint to show ALL documents in the database
+  if (type === 'debug-all-documents') {
+    try {
+      const allDocs = await executeQuery(`
+        SELECT d.id, d.application_id, d.document_type, d.file_name, d.is_current,
+               va.application_id as string_app_id
+        FROM documents d
+        LEFT JOIN vendor_applications va ON d.application_id = va.id
+        ORDER BY d.id DESC
+        LIMIT 50
+      `);
+
+      return NextResponse.json({
+        totalDocuments: allDocs.rows.length,
+        documents: allDocs.rows,
+        message: 'All documents in database (last 50)'
+      });
+    } catch (error) {
+      console.error('[Debug All Documents] Error:', error);
+      return NextResponse.json({ error: 'Debug query failed', details: String(error) }, { status: 500 });
+    }
+  }
+
+  // Debug endpoint to check document data
+  if (type === 'debug-documents') {
+    const applicationId = searchParams.get('id');
+    if (!applicationId) {
+      return NextResponse.json({ error: 'Application ID required' }, { status: 400 });
+    }
+
+    try {
+      // Get all documents (including soft-deleted)
+      const allDocs = await executeQuery(`
+        SELECT d.*, va.application_id as string_app_id, va.id as numeric_app_id
+        FROM documents d
+        LEFT JOIN vendor_applications va ON d.application_id = va.id
+        WHERE va.application_id = $1
+      `, [applicationId]);
+
+      // Get count of documents per is_current status
+      const docStats = await executeQuery(`
+        SELECT d.is_current, COUNT(*) as count
+        FROM documents d
+        JOIN vendor_applications va ON d.application_id = va.id
+        WHERE va.application_id = $1
+        GROUP BY d.is_current
+      `, [applicationId]);
+
+      // Get total documents in the entire database
+      const totalDocs = await executeQuery(`
+        SELECT COUNT(*) as total FROM documents
+      `);
+
+      // Get documents without matching application
+      const orphanedDocs = await executeQuery(`
+        SELECT d.id, d.application_id, d.document_type, d.file_name, d.is_current
+        FROM documents d
+        LEFT JOIN vendor_applications va ON d.application_id = va.id
+        WHERE va.id IS NULL
+      `);
+
+      return NextResponse.json({
+        applicationId,
+        allDocuments: allDocs.rows,
+        documentStats: docStats.rows,
+        totalDocsInDatabase: totalDocs.rows[0]?.total || 0,
+        orphanedDocuments: orphanedDocs.rows,
+        message: 'Debug info for documents'
+      });
+    } catch (error) {
+      console.error('[Debug Documents] Error:', error);
+      return NextResponse.json({ error: 'Debug query failed', details: String(error) }, { status: 500 });
+    }
+  }
+
   if (type === 'application') {
     const applicationId = searchParams.get('id');
     if (!applicationId) {
       return NextResponse.json({ error: 'Application ID required' }, { status: 400 });
     }
-    
+
     const application = await VendorApplicationDB.findByApplicationId(applicationId);
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 });
     }
-    
-    // Get documents for this application  
+
+    // DEBUG: Log the application's numeric ID being used for document lookup
+    console.log('[Admin API] Looking up documents for application:', {
+      applicationId: applicationId,
+      numericId: (application as any).id,
+      userId: (application as any).user_id
+    });
+
+    // Get documents for this application
     const documents = await DocumentDB.findByApplicationId((application as any).id);
-    
+
+    // DEBUG: Log the documents found
+    console.log('[Admin API] Documents found:', {
+      count: documents?.length || 0,
+      documentIds: documents?.map((d: any) => d.id)
+    });
+
     // Return application with documents
     const applicationWithDocs = {
       ...(application as any),
       documents
     };
-    
+
     return NextResponse.json(applicationWithDocs);
   }
 

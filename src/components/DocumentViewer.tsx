@@ -25,6 +25,7 @@ interface DocumentViewerProps {
 export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerProps) {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [zoom, setZoom] = useState(100)
+  const [fitToContainer, setFitToContainer] = useState(true)
   const [rotation, setRotation] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [compareMode, setCompareMode] = useState(false)
@@ -79,12 +80,19 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
   const getDocumentType = (doc: Document) => 
     doc.mime_type
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 300))
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 25))
+  const handleZoomIn = () => {
+    setFitToContainer(false)
+    setZoom(prev => Math.min(prev + 25, 300))
+  }
+  const handleZoomOut = () => {
+    setFitToContainer(false)
+    setZoom(prev => Math.max(prev - 25, 25))
+  }
   const handleRotate = () => setRotation(prev => (prev + 90) % 360)
   const resetView = () => {
     setZoom(100)
     setRotation(0)
+    setFitToContainer(true)
   }
 
   const handleDocumentSelect = (doc: Document) => {
@@ -94,6 +102,10 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
       setSelectedDocument(doc)
       setCompareMode(false)
       setCompareDocuments([])
+      // Reset view when selecting new document
+      setFitToContainer(true)
+      setZoom(100)
+      setRotation(0)
     }
   }
 
@@ -125,17 +137,19 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
 
   const renderImageViewer = (doc: Document, className = '') => {
     const isImage = getDocumentType(doc).startsWith('image/')
-    
+
     return (
-      <div className={`relative ${className} flex items-center justify-center min-h-96 bg-gray-50 rounded-lg overflow-hidden`}>
+      <div className={`relative ${className} flex items-center justify-center min-h-96 bg-gray-50 rounded-lg overflow-auto`}>
         {isImage ? (
-          <div className="relative">
+          <div className={`relative ${fitToContainer ? 'w-full h-full flex items-center justify-center' : ''}`}>
             <img
               src={getDocumentUrl(doc)}
               alt={getDocumentName(doc)}
-              className="max-w-none shadow-lg rounded-md cursor-pointer"
+              className={`shadow-lg rounded-md cursor-pointer ${fitToContainer ? 'max-w-full max-h-[60vh] object-contain' : 'max-w-none'}`}
               style={{
-                transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                transform: fitToContainer
+                  ? `rotate(${rotation}deg)`
+                  : `scale(${zoom / 100}) rotate(${rotation}deg)`,
                 transformOrigin: 'center',
                 transition: 'transform 0.2s ease-in-out'
               }}
@@ -223,7 +237,7 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
                 </button>
                 
                 <span className="text-sm text-gray-600 px-2 min-w-[60px] text-center">
-                  {zoom}%
+                  {fitToContainer ? 'Fit' : `${zoom}%`}
                 </span>
                 
                 <button

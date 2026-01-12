@@ -90,6 +90,77 @@ export async function POST(request: NextRequest) {
       data.state
     ].filter(Boolean).join(', ');
 
+    // Helper function to convert File to base64 for database storage
+    const fileToBase64 = async (file: File | null): Promise<{ name: string; type: string; size: number; data: string } | null> => {
+      if (!file || file.size === 0) return null;
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      return {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: base64
+      };
+    };
+
+    // DEBUG: Log incoming files from form data
+    console.log('[Vendor Register] DEBUG - Incoming files from form:');
+    console.log('[Vendor Register] id_document:', {
+      exists: !!data.id_document,
+      name: data.id_document?.name,
+      size: data.id_document?.size,
+      type: data.id_document?.type
+    });
+    console.log('[Vendor Register] photo:', {
+      exists: !!data.photo,
+      name: data.photo?.name,
+      size: data.photo?.size,
+      type: data.photo?.type
+    });
+    console.log('[Vendor Register] shop_document:', {
+      exists: !!data.shop_document,
+      name: data.shop_document?.name,
+      size: data.shop_document?.size,
+      type: data.shop_document?.type
+    });
+    console.log('[Vendor Register] shop_photo:', {
+      exists: !!data.shop_photo,
+      name: data.shop_photo?.name,
+      size: data.shop_photo?.size,
+      type: data.shop_photo?.type
+    });
+
+    // Convert files to base64 for storage in database
+    const [id_document_b64, photo_b64, shop_document_b64, shop_photo_b64] = await Promise.all([
+      fileToBase64(data.id_document),
+      fileToBase64(data.photo),
+      fileToBase64(data.shop_document),
+      fileToBase64(data.shop_photo)
+    ]);
+
+    // DEBUG: Log converted files
+    console.log('[Vendor Register] DEBUG - Converted files to base64:');
+    console.log('[Vendor Register] id_document_b64:', {
+      exists: !!id_document_b64,
+      has_data: !!(id_document_b64?.data),
+      data_length: id_document_b64?.data?.length || 0
+    });
+    console.log('[Vendor Register] photo_b64:', {
+      exists: !!photo_b64,
+      has_data: !!(photo_b64?.data),
+      data_length: photo_b64?.data?.length || 0
+    });
+    console.log('[Vendor Register] shop_document_b64:', {
+      exists: !!shop_document_b64,
+      has_data: !!(shop_document_b64?.data),
+      data_length: shop_document_b64?.data?.length || 0
+    });
+    console.log('[Vendor Register] shop_photo_b64:', {
+      exists: !!shop_photo_b64,
+      has_data: !!(shop_photo_b64?.data),
+      data_length: shop_photo_b64?.data?.length || 0
+    });
+
     // Store registration data temporarily (will be saved to DB after payment)
     const registrationData = {
       timestamp: new Date().toISOString(),
@@ -116,12 +187,13 @@ export async function POST(request: NextRequest) {
         country: 'India'
       },
       files: {
-        id_document: data.id_document,
-        photo: data.photo,
-        shop_document: data.shop_document,
-        shop_photo: data.shop_photo
-      },
-      rawData: data // Keep original data for reference
+        id_document: id_document_b64,
+        id_document_type: data.id_type,  // Store specific ID type (aadhaar_card, voter_id, etc.)
+        photo: photo_b64,
+        shop_document: shop_document_b64,
+        shop_document_type: data.shop_document_type,  // Store specific shop document type
+        shop_photo: shop_photo_b64
+      }
     };
 
     // Create Razorpay order for payment (₹151)

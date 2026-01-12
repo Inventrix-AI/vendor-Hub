@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { Search, FileText, User, MapPin, Building, Clock, CheckCircle, XCircle, AlertCircle, Copy, Phone, Mail } from 'lucide-react';
 import { useLanguage } from '@/lib/language';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -142,10 +144,14 @@ export default function TrackStatusPage() {
       <div className="bg-white shadow-sm border-b">
         <div className="container-fluid">
           <div className="flex items-center justify-between h-16 px-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                <Search className="w-6 h-6 text-white" />
-              </div>
+            <Link href="/" className="flex items-center space-x-3">
+              <Image
+                src="/Path Vikreta.png"
+                alt="Path Vikreta Ekta Sangh Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 object-contain"
+              />
               <div>
                 <h1 className="text-lg font-bold text-blue-600">
                   {language === 'hi' ? 'आवेदन की स्थिति ट्रैक करें' : 'Track Application Status'}
@@ -154,8 +160,8 @@ export default function TrackStatusPage() {
                   {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
                 </p>
               </div>
-            </div>
-            
+            </Link>
+
             <LanguageSwitcher />
           </div>
         </div>

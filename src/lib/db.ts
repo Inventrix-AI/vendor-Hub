@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -18,14 +18,24 @@ export function getDatabase(): Pool {
       urlHost: databaseUrl ? new URL(databaseUrl).hostname : 'N/A'
     });
 
+    // Check if DATABASE_URL contains sslmode parameter
+    const hasSslInUrl = databaseUrl.includes('sslmode=');
+
     pool = new Pool({
       connectionString: databaseUrl,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      // Only set SSL config if not already in URL and we're in production OR connecting to supabase
+      ssl: hasSslInUrl ? undefined : (
+        process.env.NODE_ENV === 'production' || databaseUrl.includes('supabase.co')
+          ? { rejectUnauthorized: false }
+          : false
+      ),
       max: 5, // Reduce pool size for serverless
-      idleTimeoutMillis: 10000, // Reduce idle timeout for serverless
-      connectionTimeoutMillis: 15000, // Increase connection timeout
+      idleTimeoutMillis: 30000, // Increased from 10000 for better serverless stability
+      connectionTimeoutMillis: 30000, // Increased from 15000 for slower connections
       statement_timeout: 30000, // 30 second statement timeout
       query_timeout: 30000, // 30 second query timeout
+      keepAlive: true, // Keep connections alive
+      keepAliveInitialDelayMillis: 10000, // Start keepalive after 10 seconds
     });
 
     // Add error handler for the pool
@@ -100,7 +110,7 @@ async function runMigrations() {
 
     // Check if pending_registrations table exists
     const pendingTableCheck = await pool.query(`
-      SELECT table_name FROM information_schema.tables 
+      SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name = 'pending_registrations'
     `);
 
@@ -115,6 +125,45 @@ async function runMigrations() {
       await pool.query(migration);
 
       console.log('Pending registrations table migration completed successfully');
+    }
+
+    // Check if verification columns exist
+    const verificationColumnCheck = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'vendor_applications'
+      AND column_name = 'personal_verified'
+    `);
+
+    if (verificationColumnCheck.rows.length === 0) {
+      console.log('Running migration: Adding verification columns...');
+
+      // Read and execute verification columns migration
+      const migrationPath = join(process.cwd(), 'database', 'migrations', 'add_verification_columns.sql');
+      const migration = readFileSync(migrationPath, 'utf-8');
+
+      // Execute the migration
+      await pool.query(migration);
+
+      console.log('Verification columns migration completed successfully');
+    }
+
+    // Check if certificates table exists
+    const certificatesTableCheck = await pool.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'certificates'
+    `);
+
+    if (certificatesTableCheck.rows.length === 0) {
+      console.log('Running migration: Adding certificates table...');
+
+      // Read and execute certificates table migration
+      const migrationPath = join(process.cwd(), 'database', 'migrations', 'add_certificates_table.sql');
+      const migration = readFileSync(migrationPath, 'utf-8');
+
+      // Execute the migration
+      await pool.query(migration);
+
+      console.log('Certificates table migration completed successfully');
     }
   } catch (error) {
     console.error('Error running migrations:', error);
@@ -258,6 +307,16 @@ export const VendorApplicationDB = {
     return result.rows[0] || null;
   },
 
+  findById: async (id: number) => {
+    const result = await executeQuery(`
+      SELECT va.*, u.email as user_email, u.full_name as user_full_name, u.phone as user_phone
+      FROM vendor_applications va
+      JOIN users u ON va.user_id = u.id
+      WHERE va.id = $1
+    `, [id]);
+    return result.rows[0] || null;
+  },
+
   findAll: async (filters: { status?: string; search?: string; limit?: number } = {}) => {
     let query = `
       SELECT va.*, u.email as user_email, u.full_name as user_full_name
@@ -349,6 +408,55 @@ export const VendorApplicationDB = {
     });
 
     return stats;
+  },
+
+  // Verification methods
+  updateVerification: async (applicationId: string, section: 'personal' | 'business', verifiedBy: number, notes?: string) => {
+    const verifiedColumn = section === 'personal' ? 'personal_verified' : 'business_verified';
+    const verifiedByColumn = section === 'personal' ? 'personal_verified_by' : 'business_verified_by';
+    const verifiedAtColumn = section === 'personal' ? 'personal_verified_at' : 'business_verified_at';
+
+    let query = `
+      UPDATE vendor_applications
+      SET ${verifiedColumn} = true,
+          ${verifiedByColumn} = $1,
+          ${verifiedAtColumn} = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+    `;
+    const params: any[] = [verifiedBy];
+
+    if (notes) {
+      query += `,
+          verification_notes = COALESCE(verification_notes, '[]'::jsonb) || $2::jsonb
+      `;
+      params.push(JSON.stringify([{ section, notes, timestamp: new Date().toISOString(), by: verifiedBy }]));
+    }
+
+    params.push(applicationId);
+    query += ` WHERE application_id = $${params.length} RETURNING *`;
+
+    const result = await executeQuery(query, params);
+    return result.rows[0];
+  },
+
+  getVerificationStatus: async (applicationId: string) => {
+    const result = await executeQuery(`
+      SELECT
+        va.personal_verified,
+        va.personal_verified_at,
+        va.business_verified,
+        va.business_verified_at,
+        va.verification_notes,
+        u1.full_name as personal_verified_by_name,
+        u1.email as personal_verified_by_email,
+        u2.full_name as business_verified_by_name,
+        u2.email as business_verified_by_email
+      FROM vendor_applications va
+      LEFT JOIN users u1 ON va.personal_verified_by = u1.id
+      LEFT JOIN users u2 ON va.business_verified_by = u2.id
+      WHERE va.application_id = $1
+    `, [applicationId]);
+    return result.rows[0] || null;
   }
 };
 
@@ -386,10 +494,18 @@ export const DocumentDB = {
   },
 
   findByApplicationId: async (applicationId: number) => {
+    console.log('[DocumentDB] Finding documents for application_id:', applicationId);
+
     const result = await executeQuery(
       'SELECT * FROM documents WHERE application_id = $1 AND is_current = true ORDER BY created_at DESC',
       [applicationId]
     );
+
+    console.log('[DocumentDB] Query result:', {
+      rowCount: result.rows.length,
+      applicationId: applicationId
+    });
+
     return result.rows;
   },
 
@@ -399,6 +515,60 @@ export const DocumentDB = {
       [id]
     );
     return result.rows[0] || null;
+  },
+
+  // Verification methods for documents
+  updateVerificationStatus: async (documentId: number, status: string, verifiedBy: number) => {
+    const result = await executeQuery(`
+      UPDATE documents
+      SET verification_status = $1,
+          verified_by = $2,
+          verified_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `, [status, verifiedBy, documentId]);
+    return result.rows[0];
+  },
+
+  flagDocument: async (documentId: number, reason: string, flaggedBy: number) => {
+    const result = await executeQuery(`
+      UPDATE documents
+      SET verification_status = 'flagged',
+          flag_reason = $1,
+          verified_by = $2,
+          verified_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `, [reason, flaggedBy, documentId]);
+    return result.rows[0];
+  },
+
+  requestReupload: async (documentId: number, reason: string, requestedBy: number) => {
+    const result = await executeQuery(`
+      UPDATE documents
+      SET reupload_requested = true,
+          reupload_reason = $1,
+          verification_status = 'reupload_requested',
+          verified_by = $2,
+          verified_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `, [reason, requestedBy, documentId]);
+    return result.rows[0];
+  },
+
+  getDocumentsWithVerificationStatus: async (applicationId: number) => {
+    const result = await executeQuery(`
+      SELECT d.*, u.full_name as verified_by_name, u.email as verified_by_email
+      FROM documents d
+      LEFT JOIN users u ON d.verified_by = u.id
+      WHERE d.application_id = $1 AND d.is_current = true
+      ORDER BY d.created_at DESC
+    `, [applicationId]);
+    return result.rows;
   }
 };
 
@@ -604,6 +774,122 @@ export const PendingRegistrationDB = {
       RETURNING COUNT(*)
     `);
     return result.rows[0];
+  }
+};
+
+// Certificate operations
+export const CertificateDB = {
+  create: async (certificate: {
+    certificate_number: string;
+    application_id: number;
+    vendor_id: string;
+    valid_until: Date;
+    issued_by?: number;
+  }) => {
+    const result = await executeQuery(`
+      INSERT INTO certificates (
+        certificate_number, application_id, vendor_id, valid_until, issued_by
+      ) VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [
+      certificate.certificate_number,
+      certificate.application_id,
+      certificate.vendor_id,
+      certificate.valid_until,
+      certificate.issued_by || null
+    ]);
+    return result.rows[0];
+  },
+
+  findById: async (id: number) => {
+    const result = await executeQuery(`
+      SELECT c.*, va.company_name, va.business_name, va.business_type,
+             va.contact_email, va.phone, va.address, va.city, va.state,
+             va.postal_code, va.country, va.registration_number,
+             u.full_name as vendor_name, u.email as vendor_email
+      FROM certificates c
+      JOIN vendor_applications va ON c.application_id = va.id
+      JOIN users u ON va.user_id = u.id
+      WHERE c.id = $1
+    `, [id]);
+    return result.rows[0] || null;
+  },
+
+  findByApplicationId: async (applicationId: number) => {
+    const result = await executeQuery(`
+      SELECT * FROM certificates
+      WHERE application_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [applicationId]);
+    return result.rows[0] || null;
+  },
+
+  findByCertificateNumber: async (certificateNumber: string) => {
+    const result = await executeQuery(`
+      SELECT c.*, va.company_name, va.business_name, va.business_type,
+             va.contact_email, va.phone, va.address, va.city, va.state,
+             va.postal_code, va.country, va.registration_number,
+             u.full_name as vendor_name, u.email as vendor_email
+      FROM certificates c
+      JOIN vendor_applications va ON c.application_id = va.id
+      JOIN users u ON va.user_id = u.id
+      WHERE c.certificate_number = $1
+    `, [certificateNumber]);
+    return result.rows[0] || null;
+  },
+
+  findByVendorId: async (vendorId: string) => {
+    const result = await executeQuery(`
+      SELECT * FROM certificates
+      WHERE vendor_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [vendorId]);
+    return result.rows[0] || null;
+  },
+
+  incrementDownloadCount: async (id: number) => {
+    const result = await executeQuery(`
+      UPDATE certificates
+      SET download_count = download_count + 1,
+          last_downloaded_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `, [id]);
+    return result.rows[0];
+  },
+
+  updateStatus: async (id: number, status: string, revokedReason?: string) => {
+    let query = `
+      UPDATE certificates
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+    `;
+    const params: any[] = [status];
+
+    if (status === 'revoked' && revokedReason) {
+      query += `, revoked_at = CURRENT_TIMESTAMP, revoked_reason = $2`;
+      params.push(revokedReason);
+    }
+
+    params.push(id);
+    query += ` WHERE id = $${params.length} RETURNING *`;
+
+    const result = await executeQuery(query, params);
+    return result.rows[0];
+  },
+
+  generateCertificateNumber: async () => {
+    const year = new Date().getFullYear();
+    const result = await executeQuery(`
+      SELECT COUNT(*) as count FROM certificates
+      WHERE EXTRACT(YEAR FROM created_at) = $1
+    `, [year]);
+
+    const count = parseInt(result.rows[0].count) + 1;
+    const paddedCount = count.toString().padStart(6, '0');
+    return `CERT-${year}-${paddedCount}`;
   }
 };
 

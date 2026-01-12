@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
 import { Layout } from '@/components/Layout'
 import { DocumentViewer } from '@/components/DocumentViewer'
 import { adminApi } from '@/lib/api'
-import { 
+import {
   FileText,
   MapPin,
   Building2,
@@ -17,14 +17,18 @@ import {
   XCircle,
   Eye,
   Download,
-  MessageSquare
+  MessageSquare,
+  ClipboardCheck,
+  Award
 } from 'lucide-react'
+import { CertificateDownloadButton } from '@/components/CertificateDownloadButton'
 
 export default function ApplicationReviewPage() {
   const params = useParams()
+  const router = useRouter()
   const applicationId = params.id as string
   const queryClient = useQueryClient()
-  
+
   const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected' | ''>('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [showReviewForm, setShowReviewForm] = useState(false)
@@ -169,12 +173,21 @@ export default function ApplicationReviewPage() {
           {application.status === 'under_review' && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               {!showReviewForm ? (
-                <button
-                  onClick={() => setShowReviewForm(true)}
-                  className="btn-primary"
-                >
-                  Review Application
-                </button>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => router.push(`/admin/applications/${applicationId}/verify`)}
+                    className="btn-primary flex items-center space-x-2"
+                  >
+                    <ClipboardCheck className="h-4 w-4" />
+                    <span>Start Verification</span>
+                  </button>
+                  <button
+                    onClick={() => setShowReviewForm(true)}
+                    className="btn-secondary"
+                  >
+                    Quick Review
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-4">
                   <div className="flex space-x-4">
@@ -249,6 +262,28 @@ export default function ApplicationReviewPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Certificate Section for Approved Applications */}
+          {application.status === 'approved' && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Award className="h-5 w-5 text-green-600" />
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900">Vendor Certificate</h3>
+                    <p className="text-xs text-gray-500">Download the official registration certificate</p>
+                  </div>
+                </div>
+                <CertificateDownloadButton
+                  applicationId={application.application_id}
+                  vendorId={application.vendor_id}
+                  status={application.status}
+                  variant="primary"
+                  size="md"
+                />
+              </div>
             </div>
           )}
         </div>

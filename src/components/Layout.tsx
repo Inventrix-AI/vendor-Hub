@@ -2,10 +2,11 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useAuth } from '@/lib/auth'
 import { useLanguage } from '@/lib/language'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
-import { LogOut, User, Building2, Settings, ChevronDown } from 'lucide-react'
+import { LogOut, User, Settings, ChevronDown, Phone, MapPin, UserCircle } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -48,9 +49,13 @@ export function Layout({ children, title }: LayoutProps) {
           <div className="flex items-center justify-between h-16 px-4 sm:px-6">
             <div className="flex items-center space-x-3">
               <Link href="/" className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gov-blue rounded-full flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
+                <Image
+                  src="/Path Vikreta.png"
+                  alt="Path Vikreta Ekta Sangh Logo"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 object-contain"
+                />
                 <div className="flex flex-col">
                   <span className="text-lg font-bold text-gov-blue leading-tight">
                     {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
@@ -150,6 +155,79 @@ export function Layout({ children, title }: LayoutProps) {
         )}
         {children}
       </main>
+
+      {/* Footer */}
+      <footer className="bg-gov-blue text-white">
+        <div className="container-fluid py-8 px-4 sm:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Organization Info */}
+            <div className="flex flex-col items-center md:items-start">
+              <div className="flex items-center space-x-3 mb-4">
+                <Image
+                  src="/Path Vikreta.png"
+                  alt="Path Vikreta Ekta Sangh Logo"
+                  width={56}
+                  height={56}
+                  className="w-14 h-14 object-contain bg-white rounded-lg p-1"
+                />
+                <div>
+                  <h3 className="font-bold text-lg">
+                    {language === 'hi' ? 'पथ विक्रेता एकता संघ' : 'Path Vikreta Ekta Sangh'}
+                  </h3>
+                  <p className="text-blue-200 text-sm">
+                    {language === 'hi' ? 'मध्यप्रदेश' : 'Madhya Pradesh'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Details */}
+            <div className="flex flex-col items-center md:items-start">
+              <h4 className="font-semibold text-lg mb-4">
+                {language === 'hi' ? 'संपर्क करें' : 'Contact Us'}
+              </h4>
+              <div className="space-y-3 text-blue-100">
+                <div className="flex items-center space-x-2">
+                  <UserCircle className="w-5 h-5 text-blue-200" />
+                  <span>{language === 'hi' ? 'अनुज शाक्यवार' : 'Anuj Shakyawar'}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Phone className="w-5 h-5 text-blue-200" />
+                  <a href="tel:+917000619985" className="hover:text-white transition-colors">
+                    +91 70006 19985
+                  </a>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <MapPin className="w-5 h-5 text-blue-200 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">
+                    {language === 'hi'
+                      ? 'एल जी 34 भरत आर्केड कोलार रोड़ भोपाल'
+                      : 'LG 34 Bharat Arcade, Kolar Road, Bhopal'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* FRAI Certification */}
+            <div className="flex flex-col items-center md:items-end">
+              <Image
+                src="/FRAI.png"
+                alt="FRAI Certification"
+                width={120}
+                height={120}
+                className="w-28 h-28 object-contain bg-white rounded-lg p-2"
+              />
+            </div>
+          </div>
+
+          {/* Copyright */}
+          <div className="border-t border-blue-400/30 mt-8 pt-6 text-center text-blue-200 text-sm">
+            <p>
+              © {new Date().getFullYear()} {language === 'hi' ? 'पथ विक्रेता एकता संघ। सर्वाधिकार सुरक्षित।' : 'Path Vikreta Ekta Sangh. All rights reserved.'}
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
