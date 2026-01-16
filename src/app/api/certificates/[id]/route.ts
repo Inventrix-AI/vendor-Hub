@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VendorApplicationDB, CertificateDB, DocumentDB } from '@/lib/db';
-import { generateCertificatePDF, imageUrlToBase64 } from '@/lib/certificateGenerator';
+import { generateIDCardPNG, imageUrlToBase64 } from '@/lib/certificateGenerator';
 import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 
@@ -82,10 +82,23 @@ export async function GET(
     let vendorPhotoBase64: string | undefined;
     try {
       const documents = await DocumentDB.findByApplicationId(certificate.application_id);
-      const passportPhoto = documents.find((doc: any) =>
-        doc.document_type.toLowerCase().includes('passport') ||
-        doc.document_type.toLowerCase().includes('photo')
-      );
+      console.log('[ID Card] Found documents:', documents.map((d: any) => ({
+        type: d.document_type,
+        hasUrl: !!d.file_url
+      })));
+
+      // Look for photo document - check multiple possible names
+      const passportPhoto = documents.find((doc: any) => {
+        const docType = doc.document_type.toLowerCase();
+        return docType.includes('passport') ||
+               docType.includes('photo') ||
+               docType.includes('picture') ||
+               docType.includes('image') ||
+               docType === 'vendor_photo' ||
+               docType === 'profile_photo';
+      });
+
+      console.log('[ID Card] Found photo document:', passportPhoto ? passportPhoto.document_type : 'none');
 
       if (passportPhoto && passportPhoto.file_url) {
         // Get signed URL from Supabase if using Supabase storage
@@ -117,8 +130,8 @@ export async function GET(
       // Continue without photo - it will use placeholder
     }
 
-    // Prepare certificate data
-    const certificateData = {
+    // Prepare ID card data
+    const idCardData = {
       certificateNumber: certificate.certificate_number,
       vendorId: (application as any).vendor_id || certificate.vendor_id,
       vendorName: (application as any).user_full_name || (application as any).company_name || 'Vendor',
@@ -136,27 +149,30 @@ export async function GET(
       vendorPhotoBase64
     };
 
-    // Generate PDF
-    const pdfBuffer = await generateCertificatePDF(certificateData);
+    // Generate PNG ID Card
+    const pngBuffer = await generateIDCardPNG(idCardData);
 
     // Update download count
     await CertificateDB.incrementDownloadCount(certificate.id);
 
-    // Return PDF as response
-    const response = new NextResponse(pdfBuffer, {
+    // Convert Buffer to Uint8Array for NextResponse compatibility
+    const uint8Array = new Uint8Array(pngBuffer);
+
+    // Return PNG as response
+    const response = new NextResponse(uint8Array, {
       status: 200,
       headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Certificate-${certificate.vendor_id}.pdf"`,
-        'Content-Length': pdfBuffer.byteLength.toString(),
+        'Content-Type': 'image/png',
+        'Content-Disposition': `attachment; filename="IDCard-${certificate.vendor_id}.png"`,
+        'Content-Length': pngBuffer.byteLength.toString(),
       },
     });
 
     return response;
   } catch (error) {
-    console.error('Certificate download error:', error);
+    console.error('ID Card download error:', error);
     return NextResponse.json(
-      { error: 'Failed to download certificate' },
+      { error: 'Failed to download ID card', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

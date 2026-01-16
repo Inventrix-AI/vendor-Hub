@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Download, Loader2, FileCheck, AlertCircle } from 'lucide-react';
+import { Download, Loader2, FileCheck, AlertCircle, CreditCard } from 'lucide-react';
 import { toast } from 'react-toastify';
 
-interface CertificateDownloadButtonProps {
+interface IDCardDownloadButtonProps {
   applicationId: string;
   certificateId?: number;
   vendorId?: string;
@@ -14,7 +14,10 @@ interface CertificateDownloadButtonProps {
   className?: string;
 }
 
-export function CertificateDownloadButton({
+// Legacy interface for backward compatibility
+interface CertificateDownloadButtonProps extends IDCardDownloadButtonProps {}
+
+export function IDCardDownloadButton({
   applicationId,
   certificateId,
   vendorId,
@@ -22,15 +25,15 @@ export function CertificateDownloadButton({
   variant = 'primary',
   size = 'md',
   className = ''
-}: CertificateDownloadButtonProps) {
+}: IDCardDownloadButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [localCertificateId, setLocalCertificateId] = useState<number | undefined>(certificateId);
 
   const isApproved = status.toLowerCase() === 'approved';
 
-  // Generate certificate if not exists
-  const generateCertificate = async (): Promise<number | null> => {
+  // Generate ID card record if not exists
+  const generateIDCard = async (): Promise<number | null> => {
     try {
       setIsGenerating(true);
       const response = await fetch('/api/certificates/generate', {
@@ -45,21 +48,21 @@ export function CertificateDownloadButton({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate certificate');
+        throw new Error(data.error || 'Failed to generate ID card');
       }
 
       setLocalCertificateId(data.certificate.id);
       return data.certificate.id;
     } catch (error) {
-      console.error('Certificate generation error:', error);
+      console.error('ID card generation error:', error);
       throw error;
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Download certificate
-  const downloadCertificate = async (certId: number) => {
+  // Download ID card
+  const downloadIDCard = async (certId: number) => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/certificates/${certId}`, {
@@ -69,7 +72,7 @@ export function CertificateDownloadButton({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to download certificate');
+        throw new Error(errorData.error || 'Failed to download ID card');
       }
 
       // Create blob from response
@@ -79,7 +82,7 @@ export function CertificateDownloadButton({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Certificate-${vendorId || applicationId}.pdf`;
+      a.download = `IDCard-${vendorId || applicationId}.png`;
       document.body.appendChild(a);
       a.click();
 
@@ -87,10 +90,10 @@ export function CertificateDownloadButton({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success('Certificate downloaded successfully!');
+      toast.success('ID Card downloaded successfully!');
     } catch (error) {
       console.error('Download error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to download certificate');
+      toast.error(error instanceof Error ? error.message : 'Failed to download ID card');
     } finally {
       setIsLoading(false);
     }
@@ -98,24 +101,24 @@ export function CertificateDownloadButton({
 
   const handleClick = async () => {
     if (!isApproved) {
-      toast.warning('Certificate can only be downloaded for approved applications');
+      toast.warning('ID Card can only be downloaded for approved applications');
       return;
     }
 
     try {
       let certId = localCertificateId;
 
-      // Generate certificate if not exists
+      // Generate ID card record if not exists
       if (!certId) {
-        certId = await generateCertificate();
+        certId = await generateIDCard();
         if (!certId) {
-          toast.error('Failed to generate certificate');
+          toast.error('Failed to generate ID card');
           return;
         }
       }
 
-      // Download the certificate
-      await downloadCertificate(certId);
+      // Download the ID card
+      await downloadIDCard(certId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'An error occurred');
     }
@@ -165,8 +168,8 @@ export function CertificateDownloadButton({
         </>
       ) : isApproved ? (
         <>
-          <Download className="w-4 h-4 mr-2" />
-          Download Certificate
+          <CreditCard className="w-4 h-4 mr-2" />
+          Download ID Card
         </>
       ) : (
         <>
@@ -178,8 +181,13 @@ export function CertificateDownloadButton({
   );
 }
 
-// Certificate status badge component
-export function CertificateStatusBadge({
+// Legacy export for backward compatibility
+export function CertificateDownloadButton(props: CertificateDownloadButtonProps) {
+  return <IDCardDownloadButton {...props} />;
+}
+
+// ID Card status badge component
+export function IDCardStatusBadge({
   status,
   validUntil
 }: {
@@ -213,4 +221,9 @@ export function CertificateStatusBadge({
       {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
     </span>
   );
+}
+
+// Legacy export for backward compatibility
+export function CertificateStatusBadge(props: { status: string; validUntil?: Date | string }) {
+  return <IDCardStatusBadge {...props} />;
 }

@@ -1,7 +1,8 @@
-import { jsPDF } from 'jspdf';
-import QRCode from 'qrcode';
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
 
-interface CertificateData {
+interface IDCardData {
   certificateNumber: string;
   vendorId: string;
   vendorName: string;
@@ -19,317 +20,229 @@ interface CertificateData {
   vendorPhotoBase64?: string;
 }
 
-export class CertificateGenerator {
-  private doc: jsPDF;
-  private pageWidth: number;
-  private pageHeight: number;
-  private margin: number;
-  private contentWidth: number;
+// Legacy interface for backward compatibility
+interface CertificateData extends IDCardData {}
+
+export class IDCardGenerator {
+  private templatePath: string;
+  private templateWidth = 3508;
+  private templateHeight = 2481;
 
   constructor() {
-    // A4 dimensions: 210mm x 297mm
-    this.doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-    this.pageWidth = 210;
-    this.pageHeight = 297;
-    this.margin = 15;
-    this.contentWidth = this.pageWidth - (this.margin * 2);
+    // In production (Vercel), use the public folder path
+    if (process.env.VERCEL) {
+      this.templatePath = path.join(process.cwd(), 'public', 'id-card-template.png');
+    } else {
+      this.templatePath = path.join(process.cwd(), 'public', 'id-card-template.png');
+    }
   }
 
-  async generateCertificate(data: CertificateData): Promise<ArrayBuffer> {
-    // Draw decorative border
-    this.drawBorder();
+  async generateIDCard(data: IDCardData): Promise<Buffer> {
+    // Verify template exists
+    if (!fs.existsSync(this.templatePath)) {
+      throw new Error(`Template not found at: ${this.templatePath}`);
+    }
 
-    // Draw header
-    this.drawHeader();
+    // Load the template
+    let compositeImage = sharp(this.templatePath);
 
-    // Draw title
-    this.drawTitle();
-
-    // Draw vendor photo and details
-    await this.drawVendorSection(data);
-
-    // Draw certificate body
-    this.drawCertificateBody(data);
-
-    // Draw validity section
-    this.drawValiditySection(data);
-
-    // Draw QR code and footer
-    await this.drawFooter(data);
-
-    // Return as ArrayBuffer
-    return this.doc.output('arraybuffer');
-  }
-
-  private drawBorder(): void {
-    // Outer decorative border
-    this.doc.setDrawColor(0, 51, 102); // Dark blue
-    this.doc.setLineWidth(2);
-    this.doc.rect(8, 8, this.pageWidth - 16, this.pageHeight - 16);
-
-    // Inner border
-    this.doc.setLineWidth(0.5);
-    this.doc.rect(12, 12, this.pageWidth - 24, this.pageHeight - 24);
-
-    // Corner decorations (simple lines)
-    this.doc.setLineWidth(1);
-    // Top-left
-    this.doc.line(8, 20, 20, 8);
-    // Top-right
-    this.doc.line(this.pageWidth - 8, 20, this.pageWidth - 20, 8);
-    // Bottom-left
-    this.doc.line(8, this.pageHeight - 20, 20, this.pageHeight - 8);
-    // Bottom-right
-    this.doc.line(this.pageWidth - 8, this.pageHeight - 20, this.pageWidth - 20, this.pageHeight - 8);
-  }
-
-  private drawHeader(): void {
-    const centerX = this.pageWidth / 2;
-
-    // Organization name
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(18);
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text('PATH VIKRETA EKTA SANGH', centerX, 30, { align: 'center' });
-
-    // Subtitle
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setFontSize(12);
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.text('Madhya Pradesh', centerX, 38, { align: 'center' });
-
-    // Decorative line
-    this.doc.setDrawColor(0, 51, 102);
-    this.doc.setLineWidth(1);
-    this.doc.line(this.margin + 20, 45, this.pageWidth - this.margin - 20, 45);
-    this.doc.setLineWidth(0.3);
-    this.doc.line(this.margin + 30, 47, this.pageWidth - this.margin - 30, 47);
-  }
-
-  private drawTitle(): void {
-    const centerX = this.pageWidth / 2;
-
-    // Certificate title
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(24);
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text('CERTIFICATE OF REGISTRATION', centerX, 60, { align: 'center' });
-
-    // Decorative underline
-    this.doc.setDrawColor(0, 51, 102);
-    this.doc.setLineWidth(0.5);
-    this.doc.line(centerX - 60, 64, centerX + 60, 64);
-  }
-
-  private async drawVendorSection(data: CertificateData): Promise<void> {
-    const photoX = this.margin + 10;
-    const photoY = 75;
-    const photoWidth = 35;
-    const photoHeight = 45;
-
-    // Photo placeholder/border
-    this.doc.setDrawColor(0, 51, 102);
-    this.doc.setLineWidth(0.5);
-    this.doc.rect(photoX, photoY, photoWidth, photoHeight);
+    const composites: sharp.OverlayOptions[] = [];
 
     // Add vendor photo if available
     if (data.vendorPhotoBase64) {
       try {
-        this.doc.addImage(data.vendorPhotoBase64, 'JPEG', photoX + 1, photoY + 1, photoWidth - 2, photoHeight - 2);
+        const photoBuffer = await this.processVendorPhoto(data.vendorPhotoBase64);
+        composites.push({
+          input: photoBuffer,
+          // Photo box is on the left side of the card
+          // Based on template: approximately x=95, y=815 (with some padding)
+          left: 110,
+          top: 850,
+        });
       } catch (error) {
-        console.error('Error adding vendor photo:', error);
-        // Draw placeholder text
-        this.doc.setFontSize(8);
-        this.doc.setTextColor(128, 128, 128);
-        this.doc.text('Photo', photoX + photoWidth / 2, photoY + photoHeight / 2, { align: 'center' });
+        console.error('Error processing vendor photo:', error);
+        // Continue without photo
       }
-    } else {
-      // Draw placeholder text
-      this.doc.setFontSize(8);
-      this.doc.setTextColor(128, 128, 128);
-      this.doc.text('Photo', photoX + photoWidth / 2, photoY + photoHeight / 2, { align: 'center' });
     }
 
-    // Certificate and Vendor IDs
-    const infoX = photoX + photoWidth + 15;
-    let infoY = 80;
+    // Create text overlay SVG
+    const textOverlaySvg = this.createTextOverlaySvg(data);
+    composites.push({
+      input: Buffer.from(textOverlaySvg),
+      left: 0,
+      top: 0,
+    });
 
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(10);
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text('Certificate No:', infoX, infoY);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(0, 0, 0);
-    this.doc.text(data.certificateNumber, infoX + 30, infoY);
+    // Composite all layers
+    if (composites.length > 0) {
+      compositeImage = compositeImage.composite(composites);
+    }
 
-    infoY += 8;
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text('Vendor ID:', infoX, infoY);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(0, 0, 0);
-    this.doc.text(data.vendorId, infoX + 22, infoY);
-
-    // Certification text
-    infoY += 15;
-    this.doc.setFont('helvetica', 'italic');
-    this.doc.setFontSize(11);
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.text('This is to certify that', infoX, infoY);
+    // Return as PNG buffer
+    return compositeImage.png().toBuffer();
   }
 
-  private drawCertificateBody(data: CertificateData): void {
-    let yPos = 130;
-    const leftMargin = this.margin + 15;
-    const labelWidth = 45;
+  private async processVendorPhoto(base64Data: string): Promise<Buffer> {
+    // Extract base64 content (remove data URI prefix if present)
+    const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Content, 'base64');
 
-    // Helper function to draw a field
-    const drawField = (label: string, value: string) => {
-      this.doc.setFont('helvetica', 'bold');
-      this.doc.setFontSize(11);
-      this.doc.setTextColor(0, 51, 102);
-      this.doc.text(label + ':', leftMargin, yPos);
+    // Photo area dimensions based on template analysis
+    // The photo box on the left is approximately 280x560 pixels
+    const photoWidth = 280;
+    const photoHeight = 560;
 
-      this.doc.setFont('helvetica', 'normal');
-      this.doc.setTextColor(0, 0, 0);
-      this.doc.text(value || 'N/A', leftMargin + labelWidth, yPos);
-      yPos += 10;
+    return sharp(imageBuffer)
+      .resize(photoWidth, photoHeight, {
+        fit: 'cover',
+        position: 'center',
+      })
+      .png()
+      .toBuffer();
+  }
+
+  private createTextOverlaySvg(data: IDCardData): string {
+    // Format dates in Hindi/Indian format
+    const issueDateStr = this.formatDateHindi(data.issuedAt);
+    const validUntilStr = this.formatDateHindi(data.validUntil);
+
+    // Field values
+    const name = data.vendorName || 'N/A';
+    const occupation = this.translateBusinessType(data.businessType) || data.businessType || 'N/A';
+    const shopName = data.businessName || 'N/A';
+    const fullAddress = this.formatAddress(data);
+    const idNumber = data.vendorId || data.certificateNumber || 'N/A';
+
+    // Based on template image analysis:
+    // The template has labels on the left with colons, values go after the colon
+    // Looking at the generated image, we need to place text AFTER the ":" character
+    //
+    // Template structure (approximate pixel positions at 3508x2481):
+    // - "नाम :" label ends around x=720, value starts at x=750
+    // - Each row is spaced about 190-200 pixels apart
+    // - First field (नाम/Name) starts around y=875
+
+    // Corrected coordinates based on template layout:
+    const valueStartX = 750;  // X position where values should start (after the colon)
+    const nameY = 890;        // नाम row
+    const occupationY = 1085; // व्यवसाय row
+    const shopNameY = 1280;   // दुकान का नाम row
+    const addressY = 1475;    // पता row
+    const idNumberY = 1670;   // आई. डी. क्रमांक row
+    const dateY = 1865;       // दिनांक row
+    const validityX = 2100;   // वैद्यता is on the right side of date row
+
+    // SVG with embedded text at specific coordinates
+    const svg = `
+      <svg width="${this.templateWidth}" height="${this.templateHeight}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <style>
+            .field-value {
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 56px;
+              font-weight: 600;
+              fill: #2d2d2d;
+            }
+            .field-value-small {
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 44px;
+              font-weight: 500;
+              fill: #2d2d2d;
+            }
+            .date-value {
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 50px;
+              font-weight: 600;
+              fill: #2d2d2d;
+            }
+          </style>
+        </defs>
+
+        <!-- नाम (Name) value -->
+        <text x="${valueStartX}" y="${nameY}" class="field-value">${this.escapeXml(name)}</text>
+
+        <!-- व्यवसाय (Occupation) value -->
+        <text x="${valueStartX}" y="${occupationY}" class="field-value">${this.escapeXml(occupation)}</text>
+
+        <!-- दुकान का नाम (Shop Name) value -->
+        <text x="${valueStartX}" y="${shopNameY}" class="field-value">${this.escapeXml(shopName)}</text>
+
+        <!-- पता (Address) value - smaller font for longer text -->
+        <text x="${valueStartX}" y="${addressY}" class="field-value-small">${this.escapeXml(fullAddress)}</text>
+
+        <!-- आई. डी. क्रमांक (ID Number) value -->
+        <text x="${valueStartX}" y="${idNumberY}" class="field-value">${this.escapeXml(idNumber)}</text>
+
+        <!-- दिनांक (Issue Date) value -->
+        <text x="${valueStartX}" y="${dateY}" class="date-value">${this.escapeXml(issueDateStr)}</text>
+
+        <!-- वैद्यता (Validity) value - positioned to the right -->
+        <text x="${validityX}" y="${dateY}" class="date-value">${this.escapeXml(validUntilStr)}</text>
+      </svg>
+    `;
+
+    return svg;
+  }
+
+  private formatDateHindi(date: Date): string {
+    const d = new Date(date);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  private formatAddress(data: IDCardData): string {
+    const parts = [];
+    if (data.address) parts.push(data.address);
+    if (data.city) parts.push(data.city);
+    // Keep it concise for the ID card
+    const fullAddress = parts.join(', ') || 'N/A';
+    // Truncate if too long to fit on the card
+    return fullAddress.length > 60 ? fullAddress.substring(0, 57) + '...' : fullAddress;
+  }
+
+  private translateBusinessType(businessType: string): string {
+    // Common business type translations to Hindi
+    const translations: Record<string, string> = {
+      'Vegetable Vendor': 'सब्जी विक्रेता',
+      'Fruit Vendor': 'फल विक्रेता',
+      'Food Vendor': 'खाद्य विक्रेता',
+      'Street Food': 'स्ट्रीट फूड विक्रेता',
+      'Grocery': 'किराना विक्रेता',
+      'Clothing': 'कपड़े विक्रेता',
+      'General Store': 'जनरल स्टोर',
+      'Tea Stall': 'चाय विक्रेता',
+      'Snacks': 'नाश्ता विक्रेता',
+      'Flowers': 'फूल विक्रेता',
+      'street_vendor': 'स्ट्रीट वेंडर',
+      'Other': 'अन्य',
     };
 
-    // Vendor details
-    drawField('Name', data.vendorName.toUpperCase());
-    drawField('Business Name', data.businessName);
-    drawField('Business Type', data.businessType);
+    return translations[businessType] || businessType;
+  }
 
-    yPos += 5;
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+}
 
-    // Address section
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(11);
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text('Address:', leftMargin, yPos);
-
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(0, 0, 0);
-    yPos += 7;
-    this.doc.text(data.address || 'N/A', leftMargin + 5, yPos);
-    yPos += 6;
-    this.doc.text(`${data.city}, ${data.state} - ${data.postalCode}`, leftMargin + 5, yPos);
-    yPos += 6;
-    this.doc.text(data.country, leftMargin + 5, yPos);
-
-    yPos += 12;
-
-    // Registration number if available
-    if (data.registrationNumber) {
-      drawField('Reg. Number', data.registrationNumber);
+// Legacy class alias for backward compatibility
+export class CertificateGenerator extends IDCardGenerator {
+  async generateCertificate(data: CertificateData): Promise<ArrayBuffer> {
+    const buffer = await this.generateIDCard(data);
+    // Convert Node.js Buffer to ArrayBuffer
+    const arrayBuffer = new ArrayBuffer(buffer.length);
+    const view = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < buffer.length; i++) {
+      view[i] = buffer[i];
     }
-
-    drawField('Contact', data.phone);
-
-    // Certification statement
-    yPos += 10;
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setFontSize(11);
-    this.doc.setTextColor(51, 51, 51);
-
-    const statement = 'is a registered member of Path Vikreta Ekta Sangh, Madhya Pradesh and is authorized to conduct business as per the terms and conditions of registration.';
-    const splitStatement = this.doc.splitTextToSize(statement, this.contentWidth - 30);
-    this.doc.text(splitStatement, leftMargin, yPos);
-  }
-
-  private drawValiditySection(data: CertificateData): void {
-    const yPos = 235;
-    const leftMargin = this.margin + 15;
-
-    // Horizontal line
-    this.doc.setDrawColor(0, 51, 102);
-    this.doc.setLineWidth(0.3);
-    this.doc.line(this.margin + 10, yPos - 5, this.pageWidth - this.margin - 10, yPos - 5);
-
-    // Issue and validity dates
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(10);
-    this.doc.setTextColor(0, 51, 102);
-
-    const issueDate = this.formatDate(data.issuedAt);
-    const validUntil = this.formatDate(data.validUntil);
-
-    this.doc.text('Issue Date:', leftMargin, yPos);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(0, 0, 0);
-    this.doc.text(issueDate, leftMargin + 25, yPos);
-
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text('Valid Until:', leftMargin + 80, yPos);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(0, 0, 0);
-    this.doc.text(validUntil, leftMargin + 105, yPos);
-  }
-
-  private async drawFooter(data: CertificateData): Promise<void> {
-    const yPos = 250;
-    const qrSize = 30;
-
-    // Generate QR code
-    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.pvesmp.org'}/verify/${data.certificateNumber}`;
-
-    try {
-      const qrDataUrl = await QRCode.toDataURL(verificationUrl, {
-        width: 200,
-        margin: 1,
-        color: {
-          dark: '#003366',
-          light: '#FFFFFF'
-        }
-      });
-
-      // Add QR code
-      this.doc.addImage(qrDataUrl, 'PNG', this.margin + 15, yPos, qrSize, qrSize);
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      // Draw QR placeholder
-      this.doc.setDrawColor(0, 51, 102);
-      this.doc.rect(this.margin + 15, yPos, qrSize, qrSize);
-      this.doc.setFontSize(6);
-      this.doc.text('QR Code', this.margin + 15 + qrSize / 2, yPos + qrSize / 2, { align: 'center' });
-    }
-
-    // Seal placeholder (right side)
-    const sealX = this.pageWidth - this.margin - 45;
-    this.doc.setDrawColor(0, 51, 102);
-    this.doc.setLineWidth(1);
-    this.doc.circle(sealX + 15, yPos + 15, 15);
-    this.doc.setFontSize(8);
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text('OFFICIAL', sealX + 15, yPos + 13, { align: 'center' });
-    this.doc.text('SEAL', sealX + 15, yPos + 18, { align: 'center' });
-
-    // Signature line (center)
-    const signatureX = this.pageWidth / 2;
-    this.doc.setLineWidth(0.5);
-    this.doc.line(signatureX - 30, yPos + 25, signatureX + 30, yPos + 25);
-    this.doc.setFontSize(9);
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.text('Authorized Signatory', signatureX, yPos + 30, { align: 'center' });
-
-    // Verification URL at bottom
-    this.doc.setFontSize(8);
-    this.doc.setTextColor(0, 51, 102);
-    this.doc.text(`Verify at: ${verificationUrl}`, this.pageWidth / 2, this.pageHeight - 15, { align: 'center' });
-  }
-
-  private formatDate(date: Date): string {
-    return new Date(date).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    return arrayBuffer;
   }
 }
 
@@ -348,7 +261,13 @@ export async function imageUrlToBase64(url: string): Promise<string> {
   }
 }
 
-// Export a function to generate certificate
+// Export function to generate ID card (main export)
+export async function generateIDCardPNG(data: IDCardData): Promise<Buffer> {
+  const generator = new IDCardGenerator();
+  return generator.generateIDCard(data);
+}
+
+// Legacy export for backward compatibility
 export async function generateCertificatePDF(data: CertificateData): Promise<ArrayBuffer> {
   const generator = new CertificateGenerator();
   return generator.generateCertificate(data);
