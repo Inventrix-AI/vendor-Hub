@@ -13,10 +13,6 @@ const nextConfig = {
       },
     ],
   },
-  // Skip output file tracing for sharp to avoid micromatch stack overflow
-  outputFileTracingExcludes: {
-    '/api/certificates/[id]': ['./node_modules/sharp/**/*'],
-  },
 }
 
 module.exports = nextConfig

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VendorApplicationDB, CertificateDB, DocumentDB } from '@/lib/db';
-import { generateIDCardPNG, imageUrlToBase64 } from '@/lib/certificateGenerator';
+import { generateIDCardPDF, imageUrlToBase64 } from '@/lib/certificateGenerator';
 import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 
@@ -83,11 +83,6 @@ export async function GET(
     try {
       const documents = await DocumentDB.findByApplicationId(certificate.application_id);
       console.log('[ID Card] Found documents for application:', certificate.application_id);
-      console.log('[ID Card] Documents:', documents.map((d: any) => ({
-        type: d.document_type,
-        hasUrl: !!d.file_url,
-        url: d.file_url ? d.file_url.substring(0, 50) + '...' : null
-      })));
 
       // Look for photo document - prioritize passport_photo, then photo
       const passportPhoto = documents.find((doc: any) => {
@@ -100,13 +95,8 @@ export async function GET(
                docType.includes('picture');
       });
 
-      console.log('[ID Card] Selected photo document:', passportPhoto ? {
-        type: passportPhoto.document_type,
-        url: passportPhoto.file_url?.substring(0, 80)
-      } : 'none found');
-
       if (passportPhoto && passportPhoto.file_url) {
-        console.log('[ID Card] Attempting to fetch photo from:', passportPhoto.file_url.substring(0, 100));
+        console.log('[ID Card] Found photo document, fetching...');
 
         // Get signed URL from Supabase if using Supabase storage
         if (passportPhoto.file_url.includes('supabase')) {
@@ -119,8 +109,6 @@ export async function GET(
             const bucket = pathParts[0];
             const filePath = pathParts.slice(1).join('/');
 
-            console.log('[ID Card] Supabase bucket:', bucket, 'path:', filePath);
-
             const { data, error } = await supabase.storage
               .from(bucket)
               .createSignedUrl(filePath, 3600); // 1 hour validity
@@ -130,16 +118,12 @@ export async function GET(
             }
 
             if (data?.signedUrl) {
-              console.log('[ID Card] Got signed URL, fetching image...');
               vendorPhotoBase64 = await imageUrlToBase64(data.signedUrl);
-              console.log('[ID Card] Photo fetched successfully, base64 length:', vendorPhotoBase64?.length);
             }
           }
         } else {
           // Direct URL
-          console.log('[ID Card] Using direct URL for photo');
           vendorPhotoBase64 = await imageUrlToBase64(passportPhoto.file_url);
-          console.log('[ID Card] Photo fetched successfully, base64 length:', vendorPhotoBase64?.length);
         }
       }
     } catch (photoError) {
@@ -166,22 +150,22 @@ export async function GET(
       vendorPhotoBase64
     };
 
-    // Generate PNG ID Card
-    const pngBuffer = await generateIDCardPNG(idCardData);
+    // Generate PDF ID Card
+    const pdfBuffer = await generateIDCardPDF(idCardData);
 
     // Update download count
     await CertificateDB.incrementDownloadCount(certificate.id);
 
-    // Convert Buffer to Uint8Array for NextResponse compatibility
-    const uint8Array = new Uint8Array(pngBuffer);
+    // Convert ArrayBuffer to Uint8Array for NextResponse compatibility
+    const uint8Array = new Uint8Array(pdfBuffer);
 
-    // Return PNG as response
+    // Return PDF as response
     const response = new NextResponse(uint8Array, {
       status: 200,
       headers: {
-        'Content-Type': 'image/png',
-        'Content-Disposition': `attachment; filename="IDCard-${certificate.vendor_id}.png"`,
-        'Content-Length': pngBuffer.byteLength.toString(),
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="IDCard-${certificate.vendor_id}.pdf"`,
+        'Content-Length': pdfBuffer.byteLength.toString(),
       },
     });
 

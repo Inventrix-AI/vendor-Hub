@@ -82,7 +82,7 @@ export function IDCardDownloadButton({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `IDCard-${vendorId || applicationId}.png`;
+      a.download = `IDCard-${vendorId || applicationId}.pdf`;
       document.body.appendChild(a);
       a.click();
 
