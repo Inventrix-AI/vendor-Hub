@@ -82,25 +82,32 @@ export async function GET(
     let vendorPhotoBase64: string | undefined;
     try {
       const documents = await DocumentDB.findByApplicationId(certificate.application_id);
-      console.log('[ID Card] Found documents:', documents.map((d: any) => ({
+      console.log('[ID Card] Found documents for application:', certificate.application_id);
+      console.log('[ID Card] Documents:', documents.map((d: any) => ({
         type: d.document_type,
-        hasUrl: !!d.file_url
+        hasUrl: !!d.file_url,
+        url: d.file_url ? d.file_url.substring(0, 50) + '...' : null
       })));
 
-      // Look for photo document - check multiple possible names
+      // Look for photo document - prioritize passport_photo, then photo
       const passportPhoto = documents.find((doc: any) => {
         const docType = doc.document_type.toLowerCase();
+        // Check exact matches first
+        if (docType === 'passport_photo' || docType === 'photo') return true;
+        // Then check partial matches
         return docType.includes('passport') ||
                docType.includes('photo') ||
-               docType.includes('picture') ||
-               docType.includes('image') ||
-               docType === 'vendor_photo' ||
-               docType === 'profile_photo';
+               docType.includes('picture');
       });
 
-      console.log('[ID Card] Found photo document:', passportPhoto ? passportPhoto.document_type : 'none');
+      console.log('[ID Card] Selected photo document:', passportPhoto ? {
+        type: passportPhoto.document_type,
+        url: passportPhoto.file_url?.substring(0, 80)
+      } : 'none found');
 
       if (passportPhoto && passportPhoto.file_url) {
+        console.log('[ID Card] Attempting to fetch photo from:', passportPhoto.file_url.substring(0, 100));
+
         // Get signed URL from Supabase if using Supabase storage
         if (passportPhoto.file_url.includes('supabase')) {
           const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -112,22 +119,32 @@ export async function GET(
             const bucket = pathParts[0];
             const filePath = pathParts.slice(1).join('/');
 
-            const { data } = await supabase.storage
+            console.log('[ID Card] Supabase bucket:', bucket, 'path:', filePath);
+
+            const { data, error } = await supabase.storage
               .from(bucket)
               .createSignedUrl(filePath, 3600); // 1 hour validity
 
+            if (error) {
+              console.error('[ID Card] Supabase signed URL error:', error);
+            }
+
             if (data?.signedUrl) {
+              console.log('[ID Card] Got signed URL, fetching image...');
               vendorPhotoBase64 = await imageUrlToBase64(data.signedUrl);
+              console.log('[ID Card] Photo fetched successfully, base64 length:', vendorPhotoBase64?.length);
             }
           }
         } else {
           // Direct URL
+          console.log('[ID Card] Using direct URL for photo');
           vendorPhotoBase64 = await imageUrlToBase64(passportPhoto.file_url);
+          console.log('[ID Card] Photo fetched successfully, base64 length:', vendorPhotoBase64?.length);
         }
       }
     } catch (photoError) {
-      console.error('Error fetching vendor photo:', photoError);
-      // Continue without photo - it will use placeholder
+      console.error('[ID Card] Error fetching vendor photo:', photoError);
+      // Continue without photo
     }
 
     // Prepare ID card data

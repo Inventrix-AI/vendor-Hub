@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IdGenerator } from '@/lib/vendorId';
-import { executeQuery, PendingRegistrationDB } from '@/lib/db';
+import { executeQuery, PendingRegistrationDB, VendorApplicationDB, DocumentDB, PaymentDB } from '@/lib/db';
 import Razorpay from 'razorpay';
 
 export async function POST(request: NextRequest) {
@@ -287,6 +287,75 @@ export async function POST(request: NextRequest) {
         details: process.env.NODE_ENV === 'development' && error instanceof Error ? 
           error.message : undefined
       },
+      { status: 500 }
+    );
+  }
+}
+
+// GET method for tracking application status
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const applicationId = searchParams.get('applicationId');
+
+    if (!applicationId) {
+      return NextResponse.json(
+        { error: 'Application ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Find the application by application_id
+    const application = await VendorApplicationDB.findByApplicationId(applicationId);
+
+    if (!application) {
+      return NextResponse.json(
+        { error: 'Application not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get documents for this application
+    const documents = await DocumentDB.findByApplicationId(application.id);
+
+    // Get payment details
+    const payments = await PaymentDB.findByApplicationId(application.id);
+    const latestPayment = payments.length > 0 ? payments[0] : null;
+
+    // Format the response
+    const response = {
+      application_id: application.application_id,
+      vendor_id: application.status === 'approved' ? application.vendor_id : undefined,
+      status: application.status,
+      payment_status: application.payment_status,
+      shop_name: application.company_name || application.business_name,
+      business_type: application.business_type,
+      applicant_name: application.user_full_name,
+      phone: application.user_phone || application.phone,
+      email: application.user_email || application.contact_email,
+      address: application.address,
+      city: application.city,
+      state: application.state,
+      submitted_at: application.created_at,
+      rejection_reason: application.rejection_reason,
+      documents: documents.map((doc: any) => ({
+        type: doc.document_type,
+        filename: doc.file_name,
+        uploaded_at: doc.created_at
+      })),
+      payment: latestPayment ? {
+        amount: latestPayment.amount,
+        status: latestPayment.status,
+        order_id: latestPayment.razorpay_order_id
+      } : undefined
+    };
+
+    return NextResponse.json(response);
+
+  } catch (error) {
+    console.error('Error fetching application:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch application details' },
       { status: 500 }
     );
   }

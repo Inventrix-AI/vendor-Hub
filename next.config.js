@@ -13,6 +13,26 @@ const nextConfig = {
       },
     ],
   },
+  experimental: {
+    outputFileTracingExcludes: {
+      '*': [
+        'node_modules/@swc/core-linux-x64-gnu',
+        'node_modules/@swc/core-linux-x64-musl',
+        'node_modules/@esbuild/linux-x64',
+        'node_modules/sharp/vendor',
+      ],
+    },
+  },
+  // Ensure sharp is properly bundled for serverless
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        sharp: 'commonjs sharp',
+      });
+    }
+    return config;
+  },
 }
 
 module.exports = nextConfig
