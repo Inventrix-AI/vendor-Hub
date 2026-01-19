@@ -137,19 +137,8 @@ export const paymentApi = {
   },
   
   getPaymentHistory: async () => {
-    // Mock payment history data
-    return [
-      {
-        id: 1,
-        amount: 500,
-        currency: 'INR',
-        status: 'success' as const,
-        razorpay_order_id: 'order_123456789',
-        razorpay_payment_id: 'pay_123456789',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ]
+    const response = await api.get('/api/payments')
+    return response.data
   },
 }
 

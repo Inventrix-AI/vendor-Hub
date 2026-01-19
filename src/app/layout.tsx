@@ -16,6 +16,11 @@ const notoSansDevanagari = Noto_Sans_Devanagari({
 export const metadata: Metadata = {
   title: 'पथ विक्रेता एकता संघ मध्यप्रदेश | Path Vikreta Ekta Sangh Madhya Pradesh',
   description: 'पथ विक्रेताओं के लिए एकता और विकास का मंच | Platform for unity and development of street vendors',
+  icons: {
+    icon: '/Path Vikreta.png',
+    shortcut: '/Path Vikreta.png',
+    apple: '/Path Vikreta.png',
+  },
 }
 
 export default function RootLayout({

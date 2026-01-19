@@ -84,47 +84,72 @@ export async function GET(
       const documents = await DocumentDB.findByApplicationId(certificate.application_id);
       console.log('[ID Card] Found documents for application:', certificate.application_id);
 
-      // Look for photo document - prioritize passport_photo, then photo
+      // Look for vendor's personal photo (NOT shop_photo)
+      // ONLY match exact types: passport_photo or photo
       const passportPhoto = documents.find((doc: any) => {
         const docType = doc.document_type.toLowerCase();
-        // Check exact matches first
-        if (docType === 'passport_photo' || docType === 'photo') return true;
-        // Then check partial matches
-        return docType.includes('passport') ||
-               docType.includes('photo') ||
-               docType.includes('picture');
+        // ONLY exact matches for personal vendor photo
+        // Explicitly exclude shop_photo
+        return (docType === 'passport_photo' || docType === 'photo') &&
+               !docType.includes('shop');
       });
 
-      if (passportPhoto && passportPhoto.file_url) {
-        console.log('[ID Card] Found photo document, fetching...');
+      // Debug: Log all documents found
+      console.log('[ID Card] Documents found:', documents.map((d: any) => ({
+        id: d.id,
+        type: d.document_type,
+        storage_url: d.storage_url,
+        file_path: d.file_path
+      })));
 
-        // Get signed URL from Supabase if using Supabase storage
-        if (passportPhoto.file_url.includes('supabase')) {
-          const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      if (passportPhoto) {
+        // Use storage_url (correct column name from DB schema)
+        const photoUrl = passportPhoto.storage_url || passportPhoto.file_url;
+        console.log('[ID Card] Found photo document:', {
+          document_type: passportPhoto.document_type,
+          storage_url: passportPhoto.storage_url,
+          file_path: passportPhoto.file_path,
+          photoUrl: photoUrl
+        });
 
-          // Extract bucket and path from the URL
-          const urlParts = passportPhoto.file_url.split('/storage/v1/object/public/');
-          if (urlParts.length > 1) {
-            const pathParts = urlParts[1].split('/');
-            const bucket = pathParts[0];
-            const filePath = pathParts.slice(1).join('/');
+        if (photoUrl) {
+          // Get signed URL from Supabase if using Supabase storage
+          if (photoUrl.includes('supabase')) {
+            const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-            const { data, error } = await supabase.storage
-              .from(bucket)
-              .createSignedUrl(filePath, 3600); // 1 hour validity
+            // Extract bucket and path from the URL
+            const urlParts = photoUrl.split('/storage/v1/object/public/');
+            if (urlParts.length > 1) {
+              const pathParts = urlParts[1].split('/');
+              const bucket = pathParts[0];
+              const filePath = pathParts.slice(1).join('/');
 
-            if (error) {
-              console.error('[ID Card] Supabase signed URL error:', error);
+              console.log('[ID Card] Supabase storage details:', { bucket, filePath });
+
+              const { data, error } = await supabase.storage
+                .from(bucket)
+                .createSignedUrl(filePath, 3600); // 1 hour validity
+
+              if (error) {
+                console.error('[ID Card] Supabase signed URL error:', error);
+              }
+
+              if (data?.signedUrl) {
+                console.log('[ID Card] Got signed URL, converting to base64...');
+                vendorPhotoBase64 = await imageUrlToBase64(data.signedUrl);
+                console.log('[ID Card] Photo base64 length:', vendorPhotoBase64?.length || 0);
+              }
             }
-
-            if (data?.signedUrl) {
-              vendorPhotoBase64 = await imageUrlToBase64(data.signedUrl);
-            }
+          } else {
+            // Direct URL
+            console.log('[ID Card] Using direct URL for photo');
+            vendorPhotoBase64 = await imageUrlToBase64(photoUrl);
           }
         } else {
-          // Direct URL
-          vendorPhotoBase64 = await imageUrlToBase64(passportPhoto.file_url);
+          console.log('[ID Card] Photo document found but no URL available');
         }
+      } else {
+        console.log('[ID Card] No passport photo document found');
       }
     } catch (photoError) {
       console.error('[ID Card] Error fetching vendor photo:', photoError);
@@ -132,9 +157,52 @@ export async function GET(
     }
 
     // Prepare ID card data
+    // Use vendor_id (PVS format) as the primary ID on the certificate
+    // Check multiple possible field names for vendor ID
+    // Priority: certificate.vendor_id (most reliable) > application.vendor_id
+    const appData = application as any;
+
+    console.log('[ID Card] Checking vendor IDs:', {
+      cert_vendor_id: certificate.vendor_id,
+      app_vendor_id: appData.vendor_id,
+      app_vendorId: appData.vendorId,
+    });
+
+    // Find the best vendor ID - prefer certificate's vendor_id as it's set during approval
+    let vendorIdForCert: string;
+    const certVendorId = certificate.vendor_id;
+    const appVendorId = appData.vendor_id || appData.vendorId;
+
+    if (certVendorId && certVendorId.startsWith('PVS')) {
+      // Certificate has a valid PVS vendor ID
+      vendorIdForCert = certVendorId;
+    } else if (appVendorId && appVendorId.startsWith('PVS')) {
+      // Application has a valid PVS vendor ID
+      vendorIdForCert = appVendorId;
+    } else if (certVendorId && certVendorId.length > 5) {
+      // Certificate has some vendor ID (not PVS format but long enough)
+      vendorIdForCert = certVendorId;
+    } else if (appVendorId && appVendorId.length > 5) {
+      // Application has some vendor ID
+      vendorIdForCert = appVendorId;
+    } else {
+      // Fallback: Generate PVS format with 6-digit padded application ID
+      vendorIdForCert = `PVS${String(appData.id || Date.now()).slice(-6).padStart(6, '0')}`;
+    }
+
+    console.log('[ID Card] Using vendor ID for cert:', vendorIdForCert);
+    console.log('[ID Card] Application data:', {
+      vendor_id: appData.vendor_id,
+      vendorId: appData.vendorId,
+      cert_vendor_id: certificate.vendor_id,
+      business_type: appData.business_type,
+      business_name: appData.business_name,
+      user_full_name: appData.user_full_name
+    });
+
     const idCardData = {
       certificateNumber: certificate.certificate_number,
-      vendorId: (application as any).vendor_id || certificate.vendor_id,
+      vendorId: vendorIdForCert,
       vendorName: (application as any).user_full_name || (application as any).company_name || 'Vendor',
       businessName: (application as any).business_name || (application as any).company_name || 'Business',
       businessType: (application as any).business_type || 'General',
