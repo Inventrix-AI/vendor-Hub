@@ -36,19 +36,54 @@ export default function SuccessPage() {
       await navigator.clipboard.writeText(text);
       setCopied({ ...copied, [field]: true });
       toast.success(
-        language === 'hi' 
-          ? 'कॉपी हो गया!' 
+        language === 'hi'
+          ? 'कॉपी हो गया!'
           : 'Copied to clipboard!'
       );
-      
+
       // Reset copied state after 2 seconds
       setTimeout(() => {
         setCopied({ ...copied, [field]: false });
       }, 2000);
     } catch (err) {
       toast.error(
-        language === 'hi' 
-          ? 'कॉपी नहीं हो सका' 
+        language === 'hi'
+          ? 'कॉपी नहीं हो सका'
+          : 'Failed to copy'
+      );
+    }
+  };
+
+  const copyAllCredentials = async () => {
+    const allCredentials = `${language === 'hi' ? 'पथ विक्रेता एकता संघ - लॉगिन क्रेडेंशियल' : 'Path Vikreta Ekta Sangh - Login Credentials'}
+
+${language === 'hi' ? 'आवेदन ID:' : 'Application ID:'} ${applicationId}
+${language === 'hi' ? 'विक्रेता ID (यूजरनेम):' : 'Vendor ID (Username):'} ${vendorId}
+${language === 'hi' ? 'ईमेल:' : 'Email:'} ${email}
+${language === 'hi' ? 'अस्थायी पासवर्ड:' : 'Temporary Password:'} ${password}
+${paymentId ? `${language === 'hi' ? 'भुगतान ID:' : 'Payment ID:'} ${paymentId}` : ''}
+
+${language === 'hi'
+  ? 'महत्वपूर्ण: कृपया इन क्रेडेंशियल्स को सुरक्षित रखें। आप इनका उपयोग करके लॉगिन कर सकते हैं और अपने आवेदन की स्थिति देख सकते हैं।'
+  : 'Important: Please keep these credentials secure. You can use them to login and track your application status.'
+}`;
+
+    try {
+      await navigator.clipboard.writeText(allCredentials);
+      setCopied({ ...copied, all: true });
+      toast.success(
+        language === 'hi'
+          ? 'सभी क्रेडेंशियल्स कॉपी हो गए!'
+          : 'All credentials copied!'
+      );
+
+      setTimeout(() => {
+        setCopied({ ...copied, all: false });
+      }, 2000);
+    } catch (err) {
+      toast.error(
+        language === 'hi'
+          ? 'कॉपी नहीं हो सका'
           : 'Failed to copy'
       );
     }
@@ -332,32 +367,53 @@ ${language === 'hi' ? 'तारीख:' : 'Date:'} ${new Date().toLocaleString(
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mt-8">
+            <div className="flex flex-col gap-4 mt-8">
+              {/* Copy All Button - Full Width */}
               <button
-                onClick={downloadCredentials}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                onClick={copyAllCredentials}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
               >
-                <Download className="w-5 h-5" />
-                <span>{language === 'hi' ? 'डाउनलोड करें' : 'Download'}</span>
-              </button>
-              
-              <button
-                onClick={handleAutoLogin}
-                disabled={isLoggingIn}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
-              >
-                {isLoggingIn ? (
+                {copied.all ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>{language === 'hi' ? 'लॉगिन हो रहा है...' : 'Logging in...'}</span>
+                    <Check className="w-5 h-5 text-white" />
+                    <span>{language === 'hi' ? 'सभी कॉपी हो गया!' : 'All Copied!'}</span>
                   </>
                 ) : (
                   <>
-                    <ArrowRight className="w-5 h-5" />
-                    <span>{language === 'hi' ? 'डैशबोर्ड में जाएं' : 'Go to Dashboard'}</span>
+                    <Copy className="w-5 h-5" />
+                    <span>{language === 'hi' ? 'सभी क्रेडेंशियल्स कॉपी करें' : 'Copy All Credentials'}</span>
                   </>
                 )}
               </button>
+
+              {/* Download and Login Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={downloadCredentials}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                  <span>{language === 'hi' ? 'डाउनलोड करें' : 'Download'}</span>
+                </button>
+
+                <button
+                  onClick={handleAutoLogin}
+                  disabled={isLoggingIn}
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                >
+                  {isLoggingIn ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>{language === 'hi' ? 'लॉगिन हो रहा है...' : 'Logging in...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="w-5 h-5" />
+                      <span>{language === 'hi' ? 'डैशबोर्ड में जाएं' : 'Go to Dashboard'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 

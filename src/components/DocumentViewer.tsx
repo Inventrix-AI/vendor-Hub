@@ -71,13 +71,14 @@ export function DocumentViewer({ documents, isOpen, onClose }: DocumentViewerPro
   if (!isOpen) return null
 
   // Helper functions to get document properties
-  const getDocumentName = (doc: Document) => 
+  const getDocumentName = (doc: Document) =>
     doc.document_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-  
-  const getDocumentUrl = (doc: Document) => 
-    `/api/documents/${doc.id}`
-  
-  const getDocumentType = (doc: Document) => 
+
+  // Use storage_url directly from Supabase if available, otherwise fall back to API route
+  const getDocumentUrl = (doc: Document) =>
+    doc.storage_url || `/api/documents/${doc.id}`
+
+  const getDocumentType = (doc: Document) =>
     doc.mime_type
 
   const handleZoomIn = () => {

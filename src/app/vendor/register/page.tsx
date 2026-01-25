@@ -661,15 +661,16 @@ export default function VendorRegisterPage() {
             : "Registration data validated. Please complete payment."
         );
 
-        // Show credentials from payment details
-        if (result.payment_details) {
-          setCredentials({
-            vendorId: result.payment_details.vendor_id,
-            applicationId: result.payment_details.application_id,
-            password: result.payment_details.temporary_password || 'Not available yet',
-          });
-          setShowCredentialsModal(true);
-        }
+        // Credentials will be shown on the success page after payment
+        // No need to show modal here as we redirect to success page
+        // if (result.payment_details) {
+        //   setCredentials({
+        //     vendorId: result.payment_details.vendor_id,
+        //     applicationId: result.payment_details.application_id,
+        //     password: result.payment_details.temporary_password || 'Not available yet',
+        //   });
+        //   setShowCredentialsModal(true);
+        // }
 
         // Integrate Razorpay payment with better error handling
         if (result.payment_details && window.Razorpay) {
@@ -1661,12 +1662,13 @@ export default function VendorRegisterPage() {
         </div>
       </div>
 
-      <CredentialsModal
+      {/* Credentials Modal - Commented out as credentials are shown on success page */}
+      {/* <CredentialsModal
         isOpen={showCredentialsModal}
         onClose={() => setShowCredentialsModal(false)}
         credentials={credentials}
         language={language}
-      />
+      /> */}
     </div>
   );
 }

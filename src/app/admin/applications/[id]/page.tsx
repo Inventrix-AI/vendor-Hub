@@ -136,6 +136,19 @@ export default function ApplicationReviewPage() {
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div className="card">
+          {/* Back Button */}
+          <div className="mb-4">
+            <button
+              onClick={() => router.push('/admin/applications')}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="text-sm font-medium">Back to Applications</span>
+            </button>
+          </div>
+
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-4">
               {getStatusIcon(application.status)}
@@ -153,7 +166,7 @@ export default function ApplicationReviewPage() {
                 )}
               </div>
             </div>
-            
+
             <div className="text-right">
               <span className={getStatusBadge(application.status)}>
                 {application.status.replace('_', ' ')}
