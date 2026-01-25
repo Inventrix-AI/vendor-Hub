@@ -113,37 +113,51 @@ export async function GET(
         });
 
         if (photoUrl) {
-          // Get signed URL from Supabase if using Supabase storage
-          if (photoUrl.includes('supabase')) {
-            const supabase = createClient(supabaseUrl, supabaseServiceKey);
+          console.log('[ID Card] Processing photo URL...');
 
-            // Extract bucket and path from the URL
-            const urlParts = photoUrl.split('/storage/v1/object/public/');
-            if (urlParts.length > 1) {
-              const pathParts = urlParts[1].split('/');
-              const bucket = pathParts[0];
-              const filePath = pathParts.slice(1).join('/');
-
-              console.log('[ID Card] Supabase storage details:', { bucket, filePath });
-
-              const { data, error } = await supabase.storage
-                .from(bucket)
-                .createSignedUrl(filePath, 3600); // 1 hour validity
-
-              if (error) {
-                console.error('[ID Card] Supabase signed URL error:', error);
-              }
-
-              if (data?.signedUrl) {
-                console.log('[ID Card] Got signed URL, converting to base64...');
-                vendorPhotoBase64 = await imageUrlToBase64(data.signedUrl);
-                console.log('[ID Card] Photo base64 length:', vendorPhotoBase64?.length || 0);
-              }
-            }
-          } else {
-            // Direct URL
-            console.log('[ID Card] Using direct URL for photo');
+          // Since Supabase storage is public, we can use the public URL directly
+          // No need for signed URLs if the bucket is public
+          try {
+            console.log('[ID Card] Fetching photo from:', photoUrl.substring(0, 80) + '...');
             vendorPhotoBase64 = await imageUrlToBase64(photoUrl);
+            console.log('[ID Card] ✅ Photo converted to base64, length:', vendorPhotoBase64?.length || 0);
+
+            if (!vendorPhotoBase64 || vendorPhotoBase64.length === 0) {
+              console.error('[ID Card] ❌ Photo base64 is empty!');
+            }
+          } catch (photoFetchError) {
+            console.error('[ID Card] ❌ Failed to fetch/convert photo:', photoFetchError);
+
+            // Fallback: Try with signed URL if direct access fails
+            try {
+              if (photoUrl.includes('supabase')) {
+                console.log('[ID Card] Trying signed URL approach...');
+                const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+                const urlParts = photoUrl.split('/storage/v1/object/public/');
+                if (urlParts.length > 1) {
+                  const pathParts = urlParts[1].split('/');
+                  const bucket = pathParts[0];
+                  const filePath = pathParts.slice(1).join('/');
+
+                  console.log('[ID Card] Bucket:', bucket, 'Path:', filePath);
+
+                  const { data, error } = await supabase.storage
+                    .from(bucket)
+                    .createSignedUrl(filePath, 3600);
+
+                  if (error) {
+                    console.error('[ID Card] Signed URL error:', error);
+                  } else if (data?.signedUrl) {
+                    console.log('[ID Card] Got signed URL, retrying...');
+                    vendorPhotoBase64 = await imageUrlToBase64(data.signedUrl);
+                    console.log('[ID Card] ✅ Photo fetched via signed URL, length:', vendorPhotoBase64?.length || 0);
+                  }
+                }
+              }
+            } catch (signedUrlError) {
+              console.error('[ID Card] Signed URL fallback also failed:', signedUrlError);
+            }
           }
         } else {
           console.log('[ID Card] Photo document found but no URL available');
@@ -215,8 +229,11 @@ export async function GET(
       registrationNumber: (application as any).registration_number,
       issuedAt: new Date(certificate.issued_at),
       validUntil: new Date(certificate.valid_until),
-      vendorPhotoBase64
+      vendorPhotoBase64,
+      certificateType: certificate.certificate_type || 'mp' // Pass certificate type for template selection
     };
+
+    console.log('[ID Card] Generating PDF with type:', certificate.certificate_type);
 
     // Generate PDF ID Card
     const pdfBuffer = await generateIDCardPDF(idCardData);
@@ -227,12 +244,19 @@ export async function GET(
     // Convert ArrayBuffer to Uint8Array for NextResponse compatibility
     const uint8Array = new Uint8Array(pdfBuffer);
 
+    // Generate filename based on certificate type
+    const certType = certificate.certificate_type || 'mp';
+    const certTypeLabel = certType === 'mp' ? 'MP' :
+                         certType === 'mahila_ekta' ? 'MahilaEkta' :
+                         certType.charAt(0).toUpperCase() + certType.slice(1);
+    const filename = `${certTypeLabel}-Certificate-${certificate.vendor_id}.pdf`;
+
     // Return PDF as response
     const response = new NextResponse(uint8Array, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="IDCard-${certificate.vendor_id}.pdf"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': pdfBuffer.byteLength.toString(),
       },
     });

@@ -21,6 +21,7 @@ import {
   Download,
 } from "lucide-react";
 import { CertificateDownloadButton } from "@/components/CertificateDownloadButton";
+import { MultipleCertificatesDownload } from "@/components/MultipleCertificatesDownload";
 import { VendorApplication, Payment } from "@/types";
 
 // Subscription status component
@@ -275,31 +276,38 @@ export default function VendorDashboard() {
 
         {/* Certificate Download - Only show if vendor has an approved application */}
         {approvedApplication && (
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Award className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Vendor Registration Certificate
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    Download your official registration certificate
-                  </p>
-                </div>
-              </div>
-              <CertificateDownloadButton
-                applicationId={approvedApplication.application_id}
-                vendorId={approvedApplication.vendor_id}
-                status={approvedApplication.status}
-                variant="primary"
-                size="lg"
-              />
-            </div>
-          </div>
+          <MultipleCertificatesDownload
+            applicationId={approvedApplication.application_id}
+            vendorId={approvedApplication.vendor_id}
+            status={approvedApplication.status}
+          />
         )}
+
+        {/* Track Application Link */}
+        <div className="card bg-blue-50 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Eye className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Track Your Application
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Check the status of your vendor registration application
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/track-application"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Track Application
+            </Link>
+          </div>
+        </div>
 
         {/* Applications Section */}
         <div className="card">

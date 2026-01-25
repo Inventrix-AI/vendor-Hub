@@ -51,8 +51,15 @@ export function IDCardDownloadButton({
         throw new Error(data.error || 'Failed to generate ID card');
       }
 
-      setLocalCertificateId(data.certificate.id);
-      return data.certificate.id;
+      // Handle both old (single certificate) and new (multiple certificates) API response
+      const firstCertificate = data.certificates ? data.certificates[0] : data.certificate;
+
+      if (!firstCertificate) {
+        throw new Error('No certificate data returned');
+      }
+
+      setLocalCertificateId(firstCertificate.id);
+      return firstCertificate.id;
     } catch (error) {
       console.error('ID card generation error:', error);
       throw error;

@@ -53,6 +53,7 @@ export async function GET(
       message,
       certificate: {
         certificate_number: certificate.certificate_number,
+        certificate_type: certificate.certificate_type || 'mp',
         vendor_id: certificate.vendor_id,
         vendor_name: application ?
           ((application as any).user_full_name || (application as any).company_name || 'N/A') : 'N/A',

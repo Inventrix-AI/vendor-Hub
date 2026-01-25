@@ -249,8 +249,8 @@ export const VendorApplicationDB = {
         application_id, user_id, vendor_id, company_name, business_name, contact_email, phone,
         business_type, business_description, registration_number, tax_id,
         address, city, state, postal_code, country, bank_name, account_number,
-        ifsc_code, routing_number, status, payment_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        ifsc_code, routing_number, status, payment_status, gender, age
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
       RETURNING *
     `, [
       application.application_id,
@@ -274,7 +274,9 @@ export const VendorApplicationDB = {
       application.ifsc_code || null,
       application.routing_number || null,
       'pending',
-      'pending'
+      'pending',
+      application.gender || null,
+      application.age || null
     ]);
     return result.rows[0];
   },
@@ -801,18 +803,20 @@ export const CertificateDB = {
     vendor_id: string;
     valid_until: Date;
     issued_by?: number;
+    certificate_type?: string;
   }) => {
     const result = await executeQuery(`
       INSERT INTO certificates (
-        certificate_number, application_id, vendor_id, valid_until, issued_by
-      ) VALUES ($1, $2, $3, $4, $5)
+        certificate_number, application_id, vendor_id, valid_until, issued_by, certificate_type
+      ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `, [
       certificate.certificate_number,
       certificate.application_id,
       certificate.vendor_id,
       certificate.valid_until,
-      certificate.issued_by || null
+      certificate.issued_by || null,
+      certificate.certificate_type || 'mp'
     ]);
     return result.rows[0];
   },
@@ -839,6 +843,26 @@ export const CertificateDB = {
       LIMIT 1
     `, [applicationId]);
     return result.rows[0] || null;
+  },
+
+  // Find all certificates for an application (supports multiple certificates)
+  findAllByApplicationId: async (applicationId: number) => {
+    const result = await executeQuery(`
+      SELECT * FROM certificates
+      WHERE application_id = $1
+      ORDER BY created_at DESC
+    `, [applicationId]);
+    return result.rows;
+  },
+
+  // Find all certificates for a vendor
+  findAllByVendorId: async (vendorId: string) => {
+    const result = await executeQuery(`
+      SELECT * FROM certificates
+      WHERE vendor_id = $1
+      ORDER BY certificate_type, created_at DESC
+    `, [vendorId]);
+    return result.rows;
   },
 
   findByCertificateNumber: async (certificateNumber: string) => {

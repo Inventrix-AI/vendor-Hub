@@ -21,7 +21,7 @@ import {
   ClipboardCheck,
   Award
 } from 'lucide-react'
-import { CertificateDownloadButton } from '@/components/CertificateDownloadButton'
+import { MultipleCertificatesDownload } from '@/components/MultipleCertificatesDownload'
 
 export default function ApplicationReviewPage() {
   const params = useParams()
@@ -268,22 +268,12 @@ export default function ApplicationReviewPage() {
           {/* Certificate Section for Approved Applications */}
           {application.status === 'approved' && (
             <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Award className="h-5 w-5 text-green-600" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Vendor Certificate</h3>
-                    <p className="text-xs text-gray-500">Download the official registration certificate</p>
-                  </div>
-                </div>
-                <CertificateDownloadButton
-                  applicationId={application.application_id}
-                  vendorId={application.vendor_id}
-                  status={application.status}
-                  variant="primary"
-                  size="md"
-                />
-              </div>
+              <MultipleCertificatesDownload
+                applicationId={application.application_id}
+                vendorId={application.vendor_id}
+                status={application.status}
+                className="bg-green-50 border-green-200"
+              />
             </div>
           )}
         </div>

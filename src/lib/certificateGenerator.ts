@@ -4,6 +4,9 @@ import 'regenerator-runtime/runtime';
 import { PDFDocument, rgb, PDFFont } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 
+// Certificate type definitions
+export type CertificateType = 'mp' | 'mahila_ekta' | 'bhopal' | 'jabalpur' | 'gwalior' | 'indore' | 'mandsour' | 'rewa' | 'ujjain';
+
 interface IDCardData {
   certificateNumber: string;
   vendorId: string;
@@ -20,6 +23,7 @@ interface IDCardData {
   issuedAt: Date;
   validUntil: Date;
   vendorPhotoBase64?: string;
+  certificateType?: CertificateType; // Type of certificate to generate
 }
 
 // Legacy interface for backward compatibility
@@ -58,14 +62,56 @@ function getBaseUrl(): string {
   return 'http://localhost:3000';
 }
 
+// Get template path based on certificate type
+function getTemplatePath(certificateType: CertificateType = 'mp'): string {
+  const templates: Record<CertificateType, string> = {
+    'mp': '/id-card-template.pdf',
+    'mahila_ekta': '/mahila-ekta-template.pdf',
+    'bhopal': '/bhopal-certificate-template.pdf',
+    'jabalpur': '/jabalpur-certificate-template.pdf',
+    'gwalior': '/gwalior-certificate-template.pdf',
+    'indore': '/indore-certificate-template.pdf',
+    'mandsour': '/mandsour-certificate-template.pdf',
+    'rewa': '/rewa-certificate-template.pdf',
+    'ujjain': '/ujjain-certificate-template.pdf',
+  };
+  return templates[certificateType];
+}
+
+// Determine which certificate types to generate based on gender and city
+export function determineCertificateTypes(gender: string, city: string): CertificateType[] {
+  const certificates: CertificateType[] = ['mp']; // MP certificate is common for all
+
+  // Normalize inputs
+  const normalizedGender = gender?.toLowerCase().trim();
+  const normalizedCity = city?.toLowerCase().trim();
+
+  // Cities that get location-specific certificates
+  const citySpecificCerts = ['bhopal', 'jabalpur', 'gwalior', 'indore', 'mandsour', 'rewa', 'ujjain'];
+
+  // Female vendors get Mahila Ekta certificate (no location-specific)
+  if (normalizedGender === 'female') {
+    certificates.push('mahila_ekta');
+  }
+  // Male vendors from specific cities get location-specific certificate
+  else if (citySpecificCerts.includes(normalizedCity)) {
+    certificates.push(normalizedCity as CertificateType);
+  }
+
+  return certificates;
+}
+
 export class IDCardGenerator {
   async generateIDCard(data: IDCardData): Promise<ArrayBuffer> {
     const baseUrl = getBaseUrl();
+    const certificateType = data.certificateType || 'mp';
     console.log('[PDF Generator] Using base URL:', baseUrl);
+    console.log('[PDF Generator] Certificate type:', certificateType);
 
     // Fetch template PDF via HTTP (works on both local and Vercel)
-    console.log('[PDF Generator] Loading template PDF...');
-    const templateResponse = await fetch(`${baseUrl}/id-card-template.pdf`);
+    const templatePath = getTemplatePath(certificateType);
+    console.log('[PDF Generator] Loading template PDF:', templatePath);
+    const templateResponse = await fetch(`${baseUrl}${templatePath}`);
     if (!templateResponse.ok) {
       throw new Error(`Failed to load template PDF: ${templateResponse.status} ${templateResponse.statusText}`);
     }
@@ -215,12 +261,10 @@ export class IDCardGenerator {
       color,
     });
 
-    // Occupation/Business Type - may be translated to Hindi
-    const occupationRaw = this.translateBusinessType(data.businessType) || data.businessType || 'N/A';
-    // Normalize Unicode to NFC form for proper conjunct rendering
-    const occupation = normalizeText(occupationRaw);
-    const occupationFont = getFontForText(occupation);
-    console.log('[PDF Generator] Drawing occupation:', occupation, 'font:', containsDevanagari(occupation) ? 'Hindi' : 'Latin');
+    // Occupation/Business Type - keep in English
+    const occupation = this.formatBusinessTypeEnglish(data.businessType) || data.businessType || 'N/A';
+    const occupationFont = latinFont; // Always use Latin font for English
+    console.log('[PDF Generator] Drawing occupation (English):', occupation);
     page.drawText(occupation, {
       x: FIELD_POSITIONS.occupation.x,
       y: FIELD_POSITIONS.occupation.y + baselineOffset,
@@ -355,6 +399,34 @@ export class IDCardGenerator {
 
     // No good split point, truncate with ellipsis
     return { line1: fullAddress.substring(0, 52) + '...' };
+  }
+
+  private formatBusinessTypeEnglish(businessType: string): string {
+    const englishFormats: Record<string, string> = {
+      // Convert snake_case to proper English titles
+      'retailer': 'Retailer',
+      'grocery': 'Grocery Store',
+      'pan_shop': 'Pan Shop',
+      'street_vendor': 'Street Vendor',
+      'wholesale': 'Wholesale Trader',
+      'other': 'Other',
+    };
+
+    // Case-insensitive lookup
+    const key = Object.keys(englishFormats).find(
+      k => k.toLowerCase() === businessType?.toLowerCase()
+    );
+
+    if (key) {
+      return englishFormats[key];
+    }
+
+    // If not in map, format the string nicely
+    // Convert snake_case to Title Case
+    return businessType
+      ?.split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ') || 'Other';
   }
 
   private translateBusinessType(businessType: string): string {

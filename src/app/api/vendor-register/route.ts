@@ -184,7 +184,9 @@ export async function POST(request: NextRequest) {
         city: data.city,
         state: data.state,
         postal_code: data.pincode,
-        country: 'India'
+        country: 'India',
+        gender: data.gender,  // Add gender field
+        age: parseInt(data.age) || null  // Add age field
       },
       files: {
         id_document: id_document_b64,

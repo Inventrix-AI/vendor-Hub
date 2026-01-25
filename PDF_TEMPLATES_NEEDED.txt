@@ -1,0 +1,30 @@
+PDF TEMPLATES REQUIRED FOR MULTI-CERTIFICATE SYSTEM
+====================================================
+
+Place these files in the 'public' folder with EXACT filenames:
+
+1. id-card-template.pdf                   [✓ Already exists - MP Certificate]
+2. mahila-ekta-template.pdf              [NEW - For female vendors]
+3. bhopal-certificate-template.pdf       [NEW - For Bhopal vendors]
+4. jabalpur-certificate-template.pdf     [NEW - For Jabalpur vendors]
+5. gwalior-certificate-template.pdf      [NEW - For Gwalior vendors]
+6. indore-certificate-template.pdf       [NEW - For Indore vendors]
+7. mandsour-certificate-template.pdf     [NEW - For Mandsour vendors]
+8. rewa-certificate-template.pdf         [NEW - For Rewa vendors]
+9. ujjain-certificate-template.pdf       [NEW - For Ujjain vendors]
+
+IMPORTANT NOTES:
+- Filenames must be EXACTLY as shown (lowercase, with hyphens)
+- All templates must use the SAME coordinates as id-card-template.pdf
+- PDF page size: 842 x 595 points (A4 landscape)
+- Coordinate origin: Bottom-left (0,0)
+
+Field Coordinates to use in your templates:
+- Photo: x=87, y=91, width=154, height=190
+- Name: x=426, y=276
+- Occupation: x=426, y=232
+- Outlet Name: x=426, y=192
+- Address: x=426, y=156
+- ID Number: x=426, y=103
+- Date: x=426, y=60
+- Validity: x=674, y=60

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { VendorApplicationDB, CertificateDB, DocumentDB, AuditLogDB } from '@/lib/db';
+import { VendorApplicationDB, CertificateDB, AuditLogDB } from '@/lib/db';
 import { determineCertificateTypes } from '@/lib/certificateGenerator';
 import jwt from 'jsonwebtoken';
 
@@ -23,10 +23,15 @@ function getUserFromToken(request: NextRequest): { id: number; email: string; ro
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
+    // Authenticate user (admin only)
     const user = getUserFromToken(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Access denied - Admin only' }, { status: 403 });
     }
 
     const data = await request.json();
@@ -52,40 +57,48 @@ export async function POST(request: NextRequest) {
     // Check if application is approved
     if ((application as any).status !== 'approved') {
       return NextResponse.json(
-        { error: 'Certificate can only be generated for approved applications' },
+        { error: 'Certificates can only be generated for approved applications' },
         { status: 400 }
       );
     }
 
-    // Check if user has permission (admin or application owner)
-    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
-    const isOwner = (application as any).user_id === user.id;
+    const appData = application as any;
 
-    if (!isAdmin && !isOwner) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
-    }
-
-    // Check if certificates already exist
-    const existingCertificates = await CertificateDB.findAllByApplicationId((application as any).id);
+    // Delete existing certificates for this application
+    const existingCertificates = await CertificateDB.findAllByApplicationId(appData.id);
 
     if (existingCertificates && existingCertificates.length > 0) {
-      return NextResponse.json({
-        success: true,
-        certificates: existingCertificates,
-        message: 'Certificates already exist'
-      });
+      console.log('[Certificate Regeneration] Deleting existing certificates:', existingCertificates.length);
+
+      for (const cert of existingCertificates) {
+        await CertificateDB.updateStatus(cert.id, 'revoked', 'Regenerating certificates with updated logic');
+
+        await AuditLogDB.create({
+          application_id: appData.id,
+          user_id: user.id,
+          action: `Certificate Revoked for Regeneration - ${cert.certificate_type}`,
+          entity_type: 'certificate',
+          entity_id: cert.id,
+          old_values: {
+            certificate_number: cert.certificate_number,
+            certificate_type: cert.certificate_type,
+            status: 'active'
+          },
+          new_values: {
+            status: 'revoked',
+            revoked_reason: 'Regenerating certificates with updated logic'
+          }
+        });
+      }
     }
 
     // Determine which certificate types to generate based on gender and city
-    const appData = application as any;
     const gender = appData.gender || 'male'; // Default to male if not specified
     const city = appData.city || '';
 
     const certificateTypes = determineCertificateTypes(gender, city);
-    console.log('[Certificate Generation] Generating certificates:', {
+    console.log('[Certificate Regeneration] Generating new certificates:', {
+      applicationId,
       gender,
       city,
       types: certificateTypes
@@ -95,7 +108,7 @@ export async function POST(request: NextRequest) {
     const validUntil = new Date();
     validUntil.setFullYear(validUntil.getFullYear() + 1);
 
-    // Create certificate records for each type
+    // Create new certificate records for each type
     const certificates = [];
     for (const certType of certificateTypes) {
       // Generate unique certificate number for each certificate
@@ -116,7 +129,7 @@ export async function POST(request: NextRequest) {
       await AuditLogDB.create({
         application_id: appData.id,
         user_id: user.id,
-        action: `Certificate Generated - ${certType}`,
+        action: `Certificate Generated (Regeneration) - ${certType}`,
         entity_type: 'certificate',
         entity_id: certificate.id,
         new_values: {
@@ -139,12 +152,14 @@ export async function POST(request: NextRequest) {
         valid_until: cert.valid_until,
         status: cert.status
       })),
-      message: `${certificates.length} certificate(s) generated successfully`
+      message: `Successfully regenerated ${certificates.length} certificate(s)`,
+      regenerated: true,
+      oldCertificatesRevoked: existingCertificates?.length || 0
     });
   } catch (error) {
-    console.error('Certificate generation error:', error);
+    console.error('Certificate regeneration error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate certificate' },
+      { error: 'Failed to regenerate certificates', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
