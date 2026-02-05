@@ -3,6 +3,8 @@ import 'regenerator-runtime/runtime';
 
 import { PDFDocument, rgb, PDFFont } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Certificate type definitions
 export type CertificateType = 'mp' | 'mahila_ekta' | 'bhopal' | 'jabalpur' | 'gwalior' | 'indore' | 'mandsour' | 'rewa' | 'ujjain';
@@ -55,13 +57,6 @@ const TEXT_CONFIG = {
   baselineOffset: 8,
 };
 
-// Get base URL for fetching static files (works on both local and Vercel)
-function getBaseUrl(): string {
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  return 'http://localhost:3000';
-}
-
 // Get template path based on certificate type
 function getTemplatePath(certificateType: CertificateType = 'mp'): string {
   const templates: Record<CertificateType, string> = {
@@ -103,19 +98,14 @@ export function determineCertificateTypes(gender: string, city: string): Certifi
 
 export class IDCardGenerator {
   async generateIDCard(data: IDCardData): Promise<ArrayBuffer> {
-    const baseUrl = getBaseUrl();
     const certificateType = data.certificateType || 'mp';
-    console.log('[PDF Generator] Using base URL:', baseUrl);
     console.log('[PDF Generator] Certificate type:', certificateType);
 
-    // Fetch template PDF via HTTP (works on both local and Vercel)
+    // Read template PDF from filesystem (avoids self-referential HTTP fetch that fails on production)
     const templatePath = getTemplatePath(certificateType);
-    console.log('[PDF Generator] Loading template PDF:', templatePath);
-    const templateResponse = await fetch(`${baseUrl}${templatePath}`);
-    if (!templateResponse.ok) {
-      throw new Error(`Failed to load template PDF: ${templateResponse.status} ${templateResponse.statusText}`);
-    }
-    const templateBytes = new Uint8Array(await templateResponse.arrayBuffer());
+    const templateFilePath = join(process.cwd(), 'public', templatePath);
+    console.log('[PDF Generator] Loading template PDF from:', templateFilePath);
+    const templateBytes = new Uint8Array(readFileSync(templateFilePath));
     console.log('[PDF Generator] Template loaded, size:', templateBytes.length);
 
     const pdfDoc = await PDFDocument.load(templateBytes);
@@ -132,11 +122,8 @@ export class IDCardGenerator {
     let hindiFont: PDFFont;
     try {
       console.log('[PDF Generator] Loading Hindi font...');
-      const fontResponse = await fetch(`${baseUrl}/fonts/NotoSansDevanagari-Medium.ttf`);
-      if (!fontResponse.ok) {
-        throw new Error(`Failed to load font: ${fontResponse.status} ${fontResponse.statusText}`);
-      }
-      const fontBytes = new Uint8Array(await fontResponse.arrayBuffer());
+      const fontFilePath = join(process.cwd(), 'public', 'fonts', 'NotoSansDevanagari-Medium.ttf');
+      const fontBytes = new Uint8Array(readFileSync(fontFilePath));
       console.log('[PDF Generator] Font loaded, size:', fontBytes.length);
 
       // Embed font with subset: true for proper Hindi conjunct rendering
