@@ -272,30 +272,21 @@ export class IDCardGenerator {
       color,
     });
 
-    // Address (use smaller font, support two lines if needed)
-    const addressData = this.formatAddress(data);
-    const addressFont1 = getFontForText(addressData.line1);
-    console.log('[PDF Generator] Drawing address line 1:', addressData.line1);
-    page.drawText(addressData.line1, {
-      x: FIELD_POSITIONS.address.x,
-      y: FIELD_POSITIONS.address.y + baselineOffset,
-      font: addressFont1,
-      size: smallFontSize,
-      color,
-    });
-
-    // Draw second line if exists (16pt below first line)
-    if (addressData.line2) {
-      const addressFont2 = getFontForText(addressData.line2);
-      console.log('[PDF Generator] Drawing address line 2:', addressData.line2);
-      page.drawText(addressData.line2, {
+    // Address - word-wrap into up to 3 lines using actual font width measurement
+    const fullAddress = this.formatAddress(data);
+    const addressFont = getFontForText(fullAddress);
+    const maxAddressWidth = width - FIELD_POSITIONS.address.x - 30; // 30pt right margin
+    const addressLines = this.wrapText(fullAddress, addressFont, smallFontSize, maxAddressWidth, 3);
+    console.log('[PDF Generator] Address wrapped into', addressLines.length, 'line(s):', addressLines);
+    addressLines.forEach((line, i) => {
+      page.drawText(line, {
         x: FIELD_POSITIONS.address.x,
-        y: FIELD_POSITIONS.address.y + baselineOffset - 14, // 14pt below line 1
-        font: addressFont2,
+        y: FIELD_POSITIONS.address.y + baselineOffset - (i * 14),
+        font: addressFont,
         size: smallFontSize,
         color,
       });
-    }
+    });
 
     // ID Number - always Latin characters
     const idNumber = data.vendorId || data.certificateNumber || 'N/A';
@@ -354,38 +345,61 @@ export class IDCardGenerator {
     return `${day}/${month}/${year}`;
   }
 
-  private formatAddress(data: IDCardData): { line1: string; line2?: string } {
+  private formatAddress(data: IDCardData): string {
     const parts = [];
     if (data.address) parts.push(data.address);
     if (data.city) parts.push(data.city);
     if (data.state) parts.push(data.state);
-    // Add pincode at the end if available
     if (data.postalCode) parts.push(data.postalCode);
-    const fullAddress = parts.join(', ') || 'N/A';
+    return parts.join(', ') || 'N/A';
+  }
 
-    // If address fits in one line (55 chars with smaller font), return as single line
-    if (fullAddress.length <= 55) {
-      return { line1: fullAddress };
+  private wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number, maxLines: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    let i = 0;
+
+    while (i < words.length) {
+      const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
+      if (font.widthOfTextAtSize(testLine, fontSize) <= maxWidth) {
+        currentLine = testLine;
+        i++;
+      } else if (currentLine) {
+        lines.push(currentLine);
+        currentLine = '';
+        if (lines.length >= maxLines) break;
+      } else {
+        // Single word wider than maxWidth — use it as-is (unavoidable)
+        currentLine = words[i];
+        i++;
+      }
     }
 
-    // Split at comma nearest to middle for two lines
-    const midpoint = Math.floor(fullAddress.length / 2);
-    let commaIndex = fullAddress.lastIndexOf(',', midpoint);
-
-    // If no comma found before midpoint, look after midpoint
-    if (commaIndex < 10) {
-      commaIndex = fullAddress.indexOf(',', midpoint);
+    if (currentLine && lines.length < maxLines) {
+      lines.push(currentLine);
+      i = words.length;
     }
 
-    if (commaIndex > 10 && commaIndex < fullAddress.length - 10) {
-      return {
-        line1: fullAddress.substring(0, commaIndex + 1).trim(),
-        line2: fullAddress.substring(commaIndex + 1).trim()
-      };
+    // If not all words were consumed, add … to the last line
+    if (i < words.length && lines.length > 0) {
+      const lastLine = lines[lines.length - 1];
+      if (font.widthOfTextAtSize(lastLine + '…', fontSize) <= maxWidth) {
+        lines[lines.length - 1] = lastLine + '…';
+      } else {
+        const parts = lastLine.split(' ');
+        while (parts.length > 0) {
+          parts.pop();
+          const candidate = (parts.length > 0 ? parts.join(' ') : '') + '…';
+          if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
+            lines[lines.length - 1] = candidate;
+            break;
+          }
+        }
+      }
     }
 
-    // No good split point, truncate with ellipsis
-    return { line1: fullAddress.substring(0, 52) + '...' };
+    return lines.length > 0 ? lines : ['N/A'];
   }
 
   private formatBusinessTypeEnglish(businessType: string): string {
