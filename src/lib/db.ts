@@ -238,6 +238,60 @@ export const UserDB = {
   findById: async (id: number) => {
     const result = await executeQuery('SELECT * FROM users WHERE id = $1', [id]);
     return result.rows[0] || null;
+  },
+
+  findAll: async () => {
+    const result = await executeQuery(`
+      SELECT id, email, full_name, phone, role, is_active, created_at, updated_at
+      FROM users
+      WHERE role IN ('admin', 'super_admin')
+      ORDER BY created_at DESC
+    `);
+    return result.rows;
+  },
+
+  update: async (id: number, data: {
+    role?: string;
+    is_active?: boolean;
+    full_name?: string;
+    phone?: string;
+  }) => {
+    const fields = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (data.role !== undefined) {
+      fields.push(`role = $${paramIndex++}`);
+      values.push(data.role);
+    }
+    if (data.is_active !== undefined) {
+      fields.push(`is_active = $${paramIndex++}`);
+      values.push(data.is_active);
+    }
+    if (data.full_name !== undefined) {
+      fields.push(`full_name = $${paramIndex++}`);
+      values.push(data.full_name);
+    }
+    if (data.phone !== undefined) {
+      fields.push(`phone = $${paramIndex++}`);
+      values.push(data.phone);
+    }
+
+    if (fields.length === 0) {
+      throw new Error('No fields to update');
+    }
+
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const result = await executeQuery(`
+      UPDATE users
+      SET ${fields.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING id, email, full_name, phone, role, is_active, created_at, updated_at
+    `, values);
+
+    return result.rows[0] || null;
   }
 };
 

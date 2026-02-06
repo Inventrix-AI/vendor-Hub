@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { adminApi } from "@/lib/api";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useAuth } from "@/lib/auth";
 import {
   FileText,
   Clock,
@@ -13,10 +14,12 @@ import {
   XCircle,
   TrendingUp,
   Eye,
+  Users,
 } from "lucide-react";
 import { DashboardStats } from "@/types";
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const { loading: authLoading, isAuthorized } = useAuthGuard({
     requiredRole: ["admin", "super_admin", "reviewer"],
   });
@@ -145,7 +148,7 @@ export default function AdminDashboard() {
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Quick Actions
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link
               href="/admin/applications?status=under_review"
               className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
@@ -194,6 +197,25 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </Link>
+
+            {user?.role === 'super_admin' && (
+              <Link
+                href="/admin/users"
+                className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center space-x-3">
+                  <Users className="h-6 w-6 text-purple-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">
+                      User Management
+                    </h4>
+                    <p className="text-sm text-gray-500">
+                      Create and manage admin users
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            )}
           </div>
         </div>
 
