@@ -7,14 +7,15 @@ import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import { toast } from 'react-toastify'
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Building2, 
-  Save, 
-  Eye, 
-  EyeOff, 
+import Cookies from 'js-cookie'
+import {
+  User,
+  Mail,
+  Phone,
+  Building2,
+  Save,
+  Eye,
+  EyeOff,
   Shield,
   Calendar,
   MapPin
@@ -76,12 +77,29 @@ export default function ProfilePage() {
   const handlePasswordChange = async (data: PasswordFormData) => {
     try {
       setLoading(true)
-      // TODO: Implement password change API
-      console.log('Password change:', data)
+
+      const token = Cookies.get('access_token')
+      const response = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          current_password: data.current_password,
+          new_password: data.new_password
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to change password')
+      }
+
       toast.success('Password changed successfully!')
       passwordForm.reset()
     } catch (error) {
-      toast.error('Failed to change password')
+      toast.error(error instanceof Error ? error.message : 'Failed to change password')
     } finally {
       setLoading(false)
     }

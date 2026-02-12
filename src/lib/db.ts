@@ -292,6 +292,17 @@ export const UserDB = {
     `, values);
 
     return result.rows[0] || null;
+  },
+
+  updatePassword: async (userId: number, passwordHash: string) => {
+    const result = await executeQuery(`
+      UPDATE users
+      SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING id, email, full_name, phone, role, is_active, created_at, updated_at
+    `, [passwordHash, userId]);
+
+    return result.rows[0] || null;
   }
 };
 
