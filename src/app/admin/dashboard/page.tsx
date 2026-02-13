@@ -198,6 +198,23 @@ export default function AdminDashboard() {
               </div>
             </Link>
 
+            <Link
+              href="/admin/vendors"
+              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <Users className="h-6 w-6 text-orange-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    Vendor Management
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    Manage vendors & reset passwords
+                  </p>
+                </div>
+              </div>
+            </Link>
+
             {user?.role === 'super_admin' && (
               <Link
                 href="/admin/users"
