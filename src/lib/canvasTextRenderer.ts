@@ -1,25 +1,20 @@
 import { createCanvas, GlobalFonts, type SKRSContext2D } from '@napi-rs/canvas';
-import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// Register the Hindi font once at module load
-// NotoSansDevanagari supports both Devanagari (Hindi) and Latin (English) characters
+// Register fonts once at module load
+// NotoSansDevanagari: Devanagari (Hindi) script
+// NotoSans: Latin (English) script — needed because Vercel Linux has no system fonts
 let fontRegistered = false;
 function ensureFontRegistered(): void {
   if (fontRegistered) return;
   try {
-    const fontPath = join(process.cwd(), 'public', 'fonts', 'NotoSansDevanagari-Medium.ttf');
-    // Register as primary name
-    GlobalFonts.registerFromPath(fontPath, 'NotoSansDevanagari');
-    // Also register under common fallback names so Skia resolves Latin characters
-    // to this font on Linux servers (like Vercel) that have no system fonts
-    GlobalFonts.registerFromPath(fontPath, 'Helvetica');
-    GlobalFonts.registerFromPath(fontPath, 'Arial');
-    GlobalFonts.registerFromPath(fontPath, 'sans-serif');
+    const fontsDir = join(process.cwd(), 'public', 'fonts');
+    GlobalFonts.registerFromPath(join(fontsDir, 'NotoSansDevanagari-Medium.ttf'), 'NotoSansDevanagari');
+    GlobalFonts.registerFromPath(join(fontsDir, 'NotoSans-Medium.ttf'), 'NotoSans');
     fontRegistered = true;
-    console.log('[CanvasTextRenderer] Font registered: NotoSansDevanagari (+ Helvetica, Arial, sans-serif aliases)');
+    console.log('[CanvasTextRenderer] Fonts registered: NotoSansDevanagari, NotoSans');
   } catch (error) {
-    console.error('[CanvasTextRenderer] Failed to register font:', error);
+    console.error('[CanvasTextRenderer] Failed to register fonts:', error);
     throw error;
   }
 }
@@ -132,9 +127,9 @@ export function renderTextOverlay(data: TextOverlayData): Buffer {
   ctx.fillStyle = 'rgba(26, 26, 26, 1)';  // Near-black, matches TEXT_CONFIG.color rgb(0.1, 0.1, 0.1)
   ctx.textBaseline = 'alphabetic';
 
-  // Font string: "weight size family"
-  const normalFont = `500 ${TEXT_CONFIG.fontSize}px NotoSansDevanagari, Helvetica, Arial, sans-serif`;
-  const smallFont = `500 ${TEXT_CONFIG.smallFontSize}px NotoSansDevanagari, Helvetica, Arial, sans-serif`;
+  // NotoSansDevanagari for Hindi, NotoSans for English — both bundled, no system font dependency
+  const normalFont = `500 ${TEXT_CONFIG.fontSize}px NotoSansDevanagari, NotoSans`;
+  const smallFont = `500 ${TEXT_CONFIG.smallFontSize}px NotoSansDevanagari, NotoSans`;
 
   // --- Draw each text field ---
 
