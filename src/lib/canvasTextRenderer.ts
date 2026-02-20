@@ -9,9 +9,15 @@ function ensureFontRegistered(): void {
   if (fontRegistered) return;
   try {
     const fontPath = join(process.cwd(), 'public', 'fonts', 'NotoSansDevanagari-Medium.ttf');
+    // Register as primary name
     GlobalFonts.registerFromPath(fontPath, 'NotoSansDevanagari');
+    // Also register under common fallback names so Skia resolves Latin characters
+    // to this font on Linux servers (like Vercel) that have no system fonts
+    GlobalFonts.registerFromPath(fontPath, 'Helvetica');
+    GlobalFonts.registerFromPath(fontPath, 'Arial');
+    GlobalFonts.registerFromPath(fontPath, 'sans-serif');
     fontRegistered = true;
-    console.log('[CanvasTextRenderer] Font registered: NotoSansDevanagari');
+    console.log('[CanvasTextRenderer] Font registered: NotoSansDevanagari (+ Helvetica, Arial, sans-serif aliases)');
   } catch (error) {
     console.error('[CanvasTextRenderer] Failed to register font:', error);
     throw error;
