@@ -1,10 +1,7 @@
-// Polyfill for regeneratorRuntime required by @pdf-lib/fontkit
-import 'regenerator-runtime/runtime';
-
-import { PDFDocument, rgb, PDFFont } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+import { PDFDocument } from 'pdf-lib';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { renderTextOverlay, type TextOverlayData } from './canvasTextRenderer';
 
 // Certificate type definitions
 export type CertificateType = 'mp' | 'mahila_ekta' | 'bhopal' | 'jabalpur' | 'gwalior' | 'indore' | 'mandsour' | 'rewa' | 'ujjain';
@@ -34,28 +31,8 @@ interface CertificateData extends IDCardData {}
 // PDF template dimensions: 842 x 595 points
 // Coordinate Origin: Bottom-left (0,0) - PDF standard
 
-// User-provided exact coordinates
-const FIELD_POSITIONS = {
-  // Passport photo - exact coordinates from user
-  photo: { x: 87, y: 91, width: 154, height: 190 },
-
-  // Text fields - exact coordinates from user
-  name: { x: 426, y: 276 },
-  occupation: { x: 426, y: 232 },
-  outletName: { x: 426, y: 192 },
-  address: { x: 426, y: 156 }, // Moved up by 10pt to center in field
-  idNumber: { x: 426, y: 103 },
-  date: { x: 426, y: 60 },
-  validity: { x: 674, y: 60 },
-};
-
-const TEXT_CONFIG = {
-  fontSize: 14,
-  smallFontSize: 11,
-  color: rgb(0.1, 0.1, 0.1), // Near black
-  // Baseline offset to vertically center text in 32pt field boxes
-  baselineOffset: 8,
-};
+// Photo position on the template
+const PHOTO_POSITION = { x: 87, y: 91, width: 154, height: 190 };
 
 // Get template path based on certificate type
 function getTemplatePath(certificateType: CertificateType = 'mp'): string {
@@ -101,7 +78,7 @@ export class IDCardGenerator {
     const certificateType = data.certificateType || 'mp';
     console.log('[PDF Generator] Certificate type:', certificateType);
 
-    // Read template PDF from filesystem (avoids self-referential HTTP fetch that fails on production)
+    // Step 1: Load template PDF
     const templatePath = getTemplatePath(certificateType);
     const templateFilePath = join(process.cwd(), 'public', templatePath);
     console.log('[PDF Generator] Loading template PDF from:', templateFilePath);
@@ -109,46 +86,6 @@ export class IDCardGenerator {
     console.log('[PDF Generator] Template loaded, size:', templateBytes.length);
 
     const pdfDoc = await PDFDocument.load(templateBytes);
-
-    // Register fontkit for custom font embedding
-    pdfDoc.registerFontkit(fontkit);
-
-    // Load standard Helvetica font for Latin text (English names, addresses, etc.)
-    const { StandardFonts } = await import('pdf-lib');
-    const latinFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    console.log('[PDF Generator] Latin font (Helvetica) embedded');
-
-    // Load and embed Hindi font for Devanagari text
-    let hindiFont: PDFFont;
-    try {
-      console.log('[PDF Generator] Loading Hindi font...');
-      const fontFilePath = join(process.cwd(), 'public', 'fonts', 'NotoSansDevanagari-Medium.ttf');
-      const fontBytes = new Uint8Array(readFileSync(fontFilePath));
-      console.log('[PDF Generator] Font loaded, size:', fontBytes.length);
-
-      // Embed font with subset: true for proper Hindi conjunct rendering
-      hindiFont = await pdfDoc.embedFont(fontBytes, { subset: true });
-      console.log('[PDF Generator] Hindi font embedded successfully');
-    } catch (error) {
-      console.error('[PDF Generator] Failed to load Hindi font, using Helvetica fallback:', error);
-      hindiFont = latinFont; // Fallback to Helvetica
-    }
-
-    // Helper function to detect if text contains Devanagari characters
-    const containsDevanagari = (text: string): boolean => {
-      // Devanagari Unicode range: \u0900-\u097F
-      return /[\u0900-\u097F]/.test(text);
-    };
-
-    // Helper function to normalize Unicode text (NFC form helps with conjuncts)
-    const normalizeText = (text: string): string => {
-      return text.normalize('NFC');
-    };
-
-    // Helper function to select appropriate font based on text content
-    const getFontForText = (text: string): PDFFont => {
-      return containsDevanagari(text) ? hindiFont : latinFont;
-    };
 
     // Get the first page
     const pages = pdfDoc.getPages();
@@ -164,7 +101,7 @@ export class IDCardGenerator {
       photoLength: data.vendorPhotoBase64?.length || 0
     });
 
-    // Add vendor photo if available
+    // Step 2: Embed vendor photo (unchanged — pdf-lib handles images fine)
     if (data.vendorPhotoBase64) {
       try {
         console.log('[PDF Generator] Processing vendor photo...');
@@ -177,46 +114,31 @@ export class IDCardGenerator {
         const isJpeg = header[0] === 0xFF && header[1] === 0xD8;
         const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
 
-        console.log('[PDF Generator] Image header:', Array.from(header).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
         console.log('[PDF Generator] Image type detection - JPEG:', isJpeg, 'PNG:', isPng);
 
         if (isPng) {
-          console.log('[PDF Generator] Embedding as PNG...');
           image = await pdfDoc.embedPng(photoBytes);
         } else if (isJpeg) {
-          console.log('[PDF Generator] Embedding as JPEG...');
           image = await pdfDoc.embedJpg(photoBytes);
         } else {
-          // Try JPEG as default
-          console.log('[PDF Generator] Unknown format, trying JPEG...');
           image = await pdfDoc.embedJpg(photoBytes);
         }
 
         // Get original image dimensions
         const imgDims = image.scale(1);
-        console.log('[PDF Generator] Original image dimensions:', imgDims.width, 'x', imgDims.height);
 
         // Calculate scale to fit in the photo box while maintaining aspect ratio
-        const photoConfig = FIELD_POSITIONS.photo;
         const scale = Math.min(
-          photoConfig.width / imgDims.width,
-          photoConfig.height / imgDims.height
+          PHOTO_POSITION.width / imgDims.width,
+          PHOTO_POSITION.height / imgDims.height
         );
 
         const scaledWidth = imgDims.width * scale;
         const scaledHeight = imgDims.height * scale;
 
         // Center the image in the photo box
-        const xOffset = photoConfig.x + (photoConfig.width - scaledWidth) / 2;
-        const yOffset = photoConfig.y + (photoConfig.height - scaledHeight) / 2;
-
-        console.log('[PDF Generator] Drawing photo at:', {
-          x: xOffset,
-          y: yOffset,
-          width: scaledWidth,
-          height: scaledHeight,
-          scale: scale
-        });
+        const xOffset = PHOTO_POSITION.x + (PHOTO_POSITION.width - scaledWidth) / 2;
+        const yOffset = PHOTO_POSITION.y + (PHOTO_POSITION.height - scaledHeight) / 2;
 
         page.drawImage(image, {
           x: xOffset,
@@ -233,101 +155,79 @@ export class IDCardGenerator {
       console.log('[PDF Generator] No vendor photo provided');
     }
 
-    // Draw text fields with baseline offset for vertical centering
-    const { fontSize, smallFontSize, color, baselineOffset } = TEXT_CONFIG;
+    // Step 3: Render text overlay using @napi-rs/canvas (Skia + HarfBuzz)
+    // This properly shapes Devanagari conjuncts that pdf-lib's fontkit cannot handle
+    const textData: TextOverlayData = {
+      name: data.vendorName || 'N/A',
+      occupation: this.formatBusinessTypeEnglish(data.businessType) || data.businessType || 'N/A',
+      outletName: data.businessName || 'N/A',
+      fullAddress: this.formatAddress(data),
+      idNumber: data.vendorId || data.certificateNumber || 'N/A',
+      date: this.formatDate(data.issuedAt),
+      validity: this.formatDate(data.validUntil),
+    };
 
-    // Name - use appropriate font based on content (Hindi or English)
-    const nameValue = data.vendorName || 'N/A';
-    const nameFont = getFontForText(nameValue);
-    console.log('[PDF Generator] Drawing name:', nameValue, 'font:', containsDevanagari(nameValue) ? 'Hindi' : 'Latin');
-    page.drawText(nameValue, {
-      x: FIELD_POSITIONS.name.x,
-      y: FIELD_POSITIONS.name.y + baselineOffset,
-      font: nameFont,
-      size: fontSize,
-      color,
-    });
+    try {
+      console.log('[PDF Generator] Rendering text overlay via canvas...');
+      const textOverlayPng = renderTextOverlay(textData);
+      console.log('[PDF Generator] Text overlay PNG size:', textOverlayPng.length);
 
-    // Occupation/Business Type - keep in English
-    const occupation = this.formatBusinessTypeEnglish(data.businessType) || data.businessType || 'N/A';
-    const occupationFont = latinFont; // Always use Latin font for English
-    console.log('[PDF Generator] Drawing occupation (English):', occupation);
-    page.drawText(occupation, {
-      x: FIELD_POSITIONS.occupation.x,
-      y: FIELD_POSITIONS.occupation.y + baselineOffset,
-      font: occupationFont,
-      size: fontSize,
-      color,
-    });
-
-    // Outlet/Shop Name - use appropriate font
-    const outletName = data.businessName || 'N/A';
-    const outletFont = getFontForText(outletName);
-    console.log('[PDF Generator] Drawing outlet name:', outletName, 'font:', containsDevanagari(outletName) ? 'Hindi' : 'Latin');
-    page.drawText(outletName, {
-      x: FIELD_POSITIONS.outletName.x,
-      y: FIELD_POSITIONS.outletName.y + baselineOffset,
-      font: outletFont,
-      size: fontSize,
-      color,
-    });
-
-    // Address - word-wrap into up to 3 lines using actual font width measurement
-    const fullAddress = this.formatAddress(data);
-    const addressFont = getFontForText(fullAddress);
-    const maxAddressWidth = width - FIELD_POSITIONS.address.x - 30; // 30pt right margin
-    const addressLines = this.wrapText(fullAddress, addressFont, smallFontSize, maxAddressWidth, 3);
-    console.log('[PDF Generator] Address wrapped into', addressLines.length, 'line(s):', addressLines);
-    addressLines.forEach((line, i) => {
-      page.drawText(line, {
-        x: FIELD_POSITIONS.address.x,
-        y: FIELD_POSITIONS.address.y + baselineOffset - (i * 14),
-        font: addressFont,
-        size: smallFontSize,
-        color,
+      const overlayImage = await pdfDoc.embedPng(textOverlayPng);
+      page.drawImage(overlayImage, {
+        x: 0,
+        y: 0,
+        width: width,
+        height: height,
       });
-    });
 
-    // ID Number - always Latin characters
-    const idNumber = data.vendorId || data.certificateNumber || 'N/A';
-    console.log('[PDF Generator] Drawing ID number:', idNumber);
-    page.drawText(idNumber, {
-      x: FIELD_POSITIONS.idNumber.x,
-      y: FIELD_POSITIONS.idNumber.y + baselineOffset,
-      font: latinFont, // ID numbers are always Latin
-      size: fontSize,
-      color,
-    });
+      console.log('[PDF Generator] Text overlay applied successfully');
+    } catch (canvasError) {
+      console.error('[PDF Generator] Canvas text rendering failed, falling back to pdf-lib drawText:', canvasError);
+      // Fallback: use pdf-lib drawText (broken Hindi conjuncts but at least generates)
+      await this.drawTextFallback(pdfDoc, page, data);
+    }
 
-    // Date (Issue Date) - always Latin characters
-    const dateStr = this.formatDate(data.issuedAt);
-    console.log('[PDF Generator] Drawing date:', dateStr);
-    page.drawText(dateStr, {
-      x: FIELD_POSITIONS.date.x,
-      y: FIELD_POSITIONS.date.y + baselineOffset,
-      font: latinFont, // Dates are always Latin
-      size: fontSize,
-      color,
-    });
-
-    // Validity (Valid Until) - always Latin characters
-    const validityStr = this.formatDate(data.validUntil);
-    console.log('[PDF Generator] Drawing validity:', validityStr);
-    page.drawText(validityStr, {
-      x: FIELD_POSITIONS.validity.x,
-      y: FIELD_POSITIONS.validity.y + baselineOffset,
-      font: latinFont, // Dates are always Latin
-      size: fontSize,
-      color,
-    });
-
-    // Save and return the PDF
+    // Step 4: Save and return
     console.log('[PDF Generator] Saving PDF...');
     const pdfBytes = await pdfDoc.save();
     console.log('[PDF Generator] PDF generated successfully, size:', pdfBytes.length);
 
-    // Convert Uint8Array to ArrayBuffer
     return pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer;
+  }
+
+  /**
+   * Fallback text rendering using pdf-lib's built-in Helvetica font.
+   * Hindi conjuncts will be broken, but the certificate will at least generate.
+   */
+  private async drawTextFallback(pdfDoc: PDFDocument, page: ReturnType<PDFDocument['getPages']>[0], data: IDCardData): Promise<void> {
+    const { rgb } = await import('pdf-lib');
+    const { StandardFonts } = await import('pdf-lib');
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const color = rgb(0.1, 0.1, 0.1);
+    const fontSize = 14;
+    const smallFontSize = 11;
+
+    const fields = [
+      { text: data.vendorName || 'N/A', x: 426, y: 284, size: fontSize },
+      { text: this.formatBusinessTypeEnglish(data.businessType) || data.businessType || 'N/A', x: 426, y: 240, size: fontSize },
+      { text: data.businessName || 'N/A', x: 426, y: 200, size: fontSize },
+      { text: this.formatAddress(data), x: 426, y: 164, size: smallFontSize },
+      { text: data.vendorId || data.certificateNumber || 'N/A', x: 426, y: 111, size: fontSize },
+      { text: this.formatDate(data.issuedAt), x: 426, y: 68, size: fontSize },
+      { text: this.formatDate(data.validUntil), x: 674, y: 68, size: fontSize },
+    ];
+
+    for (const field of fields) {
+      try {
+        page.drawText(field.text, { x: field.x, y: field.y, font, size: field.size, color });
+      } catch {
+        // Skip text that can't be drawn (e.g., Hindi characters with Helvetica)
+        const ascii = field.text.replace(/[^\x20-\x7E]/g, '').trim() || 'N/A';
+        try {
+          page.drawText(ascii, { x: field.x, y: field.y, font, size: field.size, color });
+        } catch { /* skip */ }
+      }
+    }
   }
 
   private base64ToUint8Array(base64: string): Uint8Array {
@@ -354,57 +254,8 @@ export class IDCardGenerator {
     return parts.join(', ') || 'N/A';
   }
 
-  private wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number, maxLines: number): string[] {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let currentLine = '';
-    let i = 0;
-
-    while (i < words.length) {
-      const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
-      if (font.widthOfTextAtSize(testLine, fontSize) <= maxWidth) {
-        currentLine = testLine;
-        i++;
-      } else if (currentLine) {
-        lines.push(currentLine);
-        currentLine = '';
-        if (lines.length >= maxLines) break;
-      } else {
-        // Single word wider than maxWidth — use it as-is (unavoidable)
-        currentLine = words[i];
-        i++;
-      }
-    }
-
-    if (currentLine && lines.length < maxLines) {
-      lines.push(currentLine);
-      i = words.length;
-    }
-
-    // If not all words were consumed, add … to the last line
-    if (i < words.length && lines.length > 0) {
-      const lastLine = lines[lines.length - 1];
-      if (font.widthOfTextAtSize(lastLine + '…', fontSize) <= maxWidth) {
-        lines[lines.length - 1] = lastLine + '…';
-      } else {
-        const parts = lastLine.split(' ');
-        while (parts.length > 0) {
-          parts.pop();
-          const candidate = (parts.length > 0 ? parts.join(' ') : '') + '…';
-          if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
-            lines[lines.length - 1] = candidate;
-            break;
-          }
-        }
-      }
-    }
-
-    return lines.length > 0 ? lines : ['N/A'];
-  }
-
   private formatBusinessTypeEnglish(businessType: string): string {
     const englishFormats: Record<string, string> = {
-      // Convert snake_case to proper English titles
       'retailer': 'Retailer',
       'grocery': 'Grocery Store',
       'pan_shop': 'Pan Shop',
@@ -413,7 +264,6 @@ export class IDCardGenerator {
       'other': 'Other',
     };
 
-    // Case-insensitive lookup
     const key = Object.keys(englishFormats).find(
       k => k.toLowerCase() === businessType?.toLowerCase()
     );
@@ -422,47 +272,10 @@ export class IDCardGenerator {
       return englishFormats[key];
     }
 
-    // If not in map, format the string nicely
-    // Convert snake_case to Title Case
     return businessType
       ?.split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ') || 'Other';
-  }
-
-  private translateBusinessType(businessType: string): string {
-    const translations: Record<string, string> = {
-      // Current form values (snake_case) - PRIMARY
-      'retailer': 'खुदरा व्यापारी',
-      'grocery': 'किराना स्टोर',
-      'pan_shop': 'पान दुकान',
-      'street_vendor': 'पथ विक्रेता',
-      'wholesale': 'होलेसेल व्यापारी',
-      'other': 'अन्य',
-      // Legacy values (for backward compatibility with old data)
-      'Vegetable Vendor': 'सब्जी विक्रेता',
-      'Fruit Vendor': 'फल विक्रेता',
-      'Food Vendor': 'खाद्य विक्रेता',
-      'Street Food': 'स्ट्रीट फूड विक्रेता',
-      'Grocery': 'किराना विक्रेता',
-      'Clothing': 'कपड़े विक्रेता',
-      'General Store': 'जनरल स्टोर',
-      'Tea Stall': 'चाय विक्रेता',
-      'Snacks': 'नाश्ता विक्रेता',
-      'Flowers': 'फूल विक्रेता',
-      'Other': 'अन्य',
-      'Retailer': 'खुदरा व्यापारी',
-      'Pan Shop': 'पान दुकान',
-      'Street Vendor': 'पथ विक्रेता',
-      'Wholesale': 'होलेसेल व्यापारी',
-      'Wholesale Trader': 'होलेसेल व्यापारी',
-      'Grocery Store': 'किराना स्टोर',
-    };
-    // Case-insensitive lookup
-    const key = Object.keys(translations).find(
-      k => k.toLowerCase() === businessType?.toLowerCase()
-    );
-    return key ? translations[key] : (businessType || 'अन्य');
   }
 }
 

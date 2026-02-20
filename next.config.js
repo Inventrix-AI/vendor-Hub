@@ -13,6 +13,19 @@ const nextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Externalize @napi-rs/canvas — it has native binaries that webpack should not bundle
+      config.externals = config.externals || [];
+      config.externals.push({
+        '@napi-rs/canvas': 'commonjs @napi-rs/canvas',
+      });
+    }
+    return config;
+  },
+  experimental: {
+    serverComponentsExternalPackages: ['@napi-rs/canvas'],
+  },
 }
 
 module.exports = nextConfig
