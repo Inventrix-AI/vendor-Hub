@@ -91,7 +91,7 @@ export default function ReportsPage() {
       ['Rejected Applications', data.rejectedApplications],
       ['Approval Rate (%)', data.approvalRate],
       ['Average Processing Time (days)', data.averageProcessingTime],
-      ['Monthly Revenue (₹)', data.monthlyRevenue]
+      // ['Monthly Revenue (₹)', data.monthlyRevenue]
     ]
     
     return [headers, ...rows].map(row => row.join(',')).join('\n')
@@ -158,7 +158,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="card">
             <div className="flex items-center">
               <div className="p-3 rounded-lg bg-blue-100">
@@ -195,7 +195,7 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <div className="card">
+          {/* <div className="card">
             <div className="flex items-center">
               <div className="p-3 rounded-lg bg-purple-100">
                 <DollarSign className="h-6 w-6 text-purple-600" />
@@ -205,7 +205,7 @@ export default function ReportsPage() {
                 <p className="text-2xl font-bold text-gray-900">₹{analyticsData.monthlyRevenue.toLocaleString()}</p>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Charts Section */}
