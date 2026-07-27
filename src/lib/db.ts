@@ -843,6 +843,41 @@ export const PendingRegistrationDB = {
     return null;
   },
 
+  // Like findByOrderId but ignores the 30-minute expiry window. Used by the
+  // webhook and reconciliation cron: a payment can be captured (and its webhook
+  // delivered) long after the staged row has "expired", but the staged data is
+  // still valid and must be materialised rather than lost.
+  findByOrderIdIgnoreExpiry: async (razorpayOrderId: string) => {
+    const result = await executeQuery(`
+      SELECT * FROM pending_registrations WHERE razorpay_order_id = $1
+    `, [razorpayOrderId]);
+
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      return {
+        ...row,
+        registration_data: typeof row.registration_data === 'string'
+          ? JSON.parse(row.registration_data)
+          : row.registration_data
+      };
+    }
+    return null;
+  },
+
+  // All staged rows regardless of expiry, newest first. Used by the
+  // reconciliation cron to check each staged order against Razorpay.
+  findAll: async () => {
+    const result = await executeQuery(`
+      SELECT * FROM pending_registrations ORDER BY created_at DESC
+    `);
+    return result.rows.map((row: any) => ({
+      ...row,
+      registration_data: typeof row.registration_data === 'string'
+        ? JSON.parse(row.registration_data)
+        : row.registration_data
+    }));
+  },
+
   deleteByOrderId: async (razorpayOrderId: string) => {
     const result = await executeQuery(`
       DELETE FROM pending_registrations WHERE razorpay_order_id = $1
